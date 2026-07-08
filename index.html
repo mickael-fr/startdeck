@@ -155,17 +155,20 @@ a{color:inherit;text-decoration:none}
 .tab-add:hover{color:var(--accent);border-color:var(--accent)}
 
 /* ============ BOARD ============ */
-.board{display:grid;gap:16px;align-items:start}
+.board{display:grid;gap:16px;align-items:stretch}
 .column{display:flex;flex-direction:column;gap:16px;min-height:60px}
 .column.dragover{outline:2px dashed var(--accent);outline-offset:6px;border-radius:14px}
 .col-empty{border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted2);font-size:.85rem}
 
 /* ============ WIDGET ============ */
-.widget{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:border-color .15s,transform .05s}
+.widget{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:border-color .15s,transform .05s}
+.widget .widget-head{flex:none}
+.widget.drop-before{outline:2px dashed var(--accent);outline-offset:-2px}
+.addbar{display:flex;justify-content:center;margin-top:4px}
 .widget.sized{display:flex;flex-direction:column}
 .widget.sized .widget-body{flex:1;overflow-y:auto}
 .widget.resizing{transition:none;border-color:var(--accent)}
-.resize-h{position:absolute;right:4px;bottom:4px;width:18px;height:18px;display:grid;place-items:center;color:var(--muted2);cursor:ns-resize;border-radius:6px;opacity:0;transition:opacity .12s;touch-action:none;z-index:3}
+.resize-h{position:absolute;right:3px;bottom:3px;width:18px;height:18px;display:grid;place-items:center;color:var(--muted2);cursor:nwse-resize;border-radius:6px;opacity:0;transition:opacity .12s;touch-action:none;z-index:3}
 .widget:hover .resize-h{opacity:.8}
 .resize-h:hover{color:var(--accent);background:var(--surface2);opacity:1}
 .resize-h svg{width:14px;height:14px}
@@ -182,7 +185,7 @@ a{color:inherit;text-decoration:none}
 .w-tool:hover{color:var(--text);background:var(--surface2)}
 .w-tool.danger:hover{color:var(--down)}
 .w-tool svg{width:15px;height:15px}
-.widget-body{padding:8px 8px 10px}
+.widget-body{padding:8px 8px 10px;flex:1;min-height:0;overflow-y:auto}
 
 /* bookmarks */
 .links{display:flex;flex-direction:column;gap:1px}
@@ -202,7 +205,7 @@ a{color:inherit;text-decoration:none}
 .add-link:hover{color:var(--accent);border-color:var(--accent)}
 
 /* notes */
-.notes-area{width:100%;min-height:120px;resize:vertical;border:none;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:.92rem;line-height:1.55;padding:4px}
+.notes-area{width:100%;height:100%;min-height:110px;resize:none;border:none;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:.92rem;line-height:1.55;padding:4px}
 .notes-area::placeholder{color:var(--muted2)}
 
 /* tasks */
@@ -532,35 +535,71 @@ function renderTabs(){
   t.appendChild(add);
 }
 
+const GRID_ROW=18, GRID_GAP=16;
+function estimateRows(w){
+  let px=120;
+  if(w.type==="bookmarks") px=92+((w.data.links||[]).length)*38+44;
+  else if(w.type==="tasks") px=96+((w.data.items||[]).length)*36+44;
+  else if(w.type==="crypto") px=70+(w.data.coins?String(w.data.coins).split(",").filter(Boolean).length:2)*44;
+  else if(w.type==="weather") px=234;
+  else if(w.type==="rss") px=380;
+  else if(w.type==="notes") px=196;
+  return Math.max(6, Math.round((px+GRID_GAP)/(GRID_ROW+GRID_GAP)));
+}
+function ensureSizing(w){
+  if(w.w===undefined) w.w=1;
+  if(w.rows===undefined){
+    if(w.h){ w.rows=Math.max(6,Math.round((w.h+GRID_GAP)/(GRID_ROW+GRID_GAP))); delete w.h; }
+    else w.rows=estimateRows(w);
+  }
+}
+function orderedWidgets(page){
+  const ws=page.widgets;
+  if(ws.some(x=>x.col!==undefined && x.w===undefined)){
+    // migrate old column-bucket layout -> flat row-major order
+    const buckets={};
+    ws.forEach(x=>{ const c=x.col||0; (buckets[c]||(buckets[c]=[])).push(x); });
+    Object.values(buckets).forEach(b=>b.sort((a,b2)=>(a.order||0)-(b2.order||0)));
+    const cnos=Object.keys(buckets).map(Number); const maxC=cnos.length?Math.max(...cnos):0;
+    const maxLen=Math.max(0,...Object.values(buckets).map(b=>b.length));
+    const flat=[];
+    for(let r=0;r<maxLen;r++){ for(let c=0;c<=maxC;c++){ if(buckets[c]&&buckets[c][r]) flat.push(buckets[c][r]); } }
+    flat.forEach((x,i)=>{ x.order=i; delete x.col; });
+    page.widgets=flat;
+  }
+  page.widgets.forEach(ensureSizing);
+  return [...page.widgets].sort((a,b)=>(a.order||0)-(b.order||0));
+}
 function renderBoard(){
   const board=$("#board");
   const cols=state.settings.columns;
   const vw=window.innerWidth;
   const shown = vw<640?1 : vw<980?Math.min(2,cols) : cols;
   board.style.gridTemplateColumns=`repeat(${shown},1fr)`;
+  board.style.gridAutoRows=GRID_ROW+"px";
+  board.style.gridAutoFlow="row";
   board.innerHTML="";
   const page=activePage();
-  const columns=Array.from({length:shown},()=>[]);
-  page.widgets.forEach(w=>{ const c=Math.min(w.col||0,shown-1); columns[c].push(w); });
-  columns.forEach(arr=>arr.sort((a,b)=>(a.order||0)-(b.order||0)));
-  columns.forEach((arr,ci)=>{
-    const col=document.createElement("div");
-    col.className="column"; col.dataset.col=ci;
-    arr.forEach(w=>col.appendChild(renderWidget(w)));
-    const drop=document.createElement("div");
-    drop.className="col-empty"; drop.textContent=arr.length?"":"Déposez une carte ici · + pour en ajouter";
-    if(!arr.length){ drop.onclick=openAddWidget; col.appendChild(drop); }
-    setupColumnDrop(col,ci);
-    board.appendChild(col);
+  const ordered=orderedWidgets(page);
+  if(!ordered.length){
+    const empty=document.createElement("div");
+    empty.className="col-empty"; empty.style.gridColumn="1/-1";
+    empty.textContent="Aucune carte · cliquez pour en ajouter une";
+    empty.onclick=openAddWidget; board.appendChild(empty);
+  }
+  ordered.forEach(w=>{
+    const el=renderWidget(w);
+    el.style.gridColumn=`span ${Math.min(w.w||1,shown)}`;
+    el.style.gridRow=`span ${w.rows||8}`;
+    board.appendChild(el);
   });
-  // floating add button row
   const addBar=document.createElement("div");
-  addBar.style.gridColumn="1/-1";
-  addBar.style.display="flex"; addBar.style.justifyContent="center"; addBar.style.marginTop="4px";
+  addBar.className="addbar"; addBar.style.gridColumn="1/-1";
   const ab=document.createElement("button");
-  ab.className="w-cfg-btn"; ab.textContent="+ Ajouter une carte";
-  ab.onclick=openAddWidget;
+  ab.className="w-cfg-btn"; ab.textContent="+ Ajouter une carte"; ab.onclick=openAddWidget;
   addBar.appendChild(ab);
+  addBar.addEventListener("dragover",(e)=>{ if(dragW) e.preventDefault(); });
+  addBar.addEventListener("drop",(e)=>{ e.preventDefault(); if(dragW) reorderWidget(dragW,null); });
   board.appendChild(addBar);
 }
 
@@ -612,17 +651,26 @@ function renderWidget(w){
 
 function addResizeHandle(w,el){
   const h=document.createElement("div");
-  h.className="resize-h"; h.title="Glisser pour ajuster la hauteur · double-clic pour réinitialiser";
-  h.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 18h8M10 22h4"/></svg>';
+  h.className="resize-h"; h.title="Glisser pour redimensionner (largeur + hauteur) · double-clic pour réinitialiser";
+  h.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v6h-6M21 21l-8-8M15 21H9a6 6 0 0 1-6-6V9"/></svg>';
   h.addEventListener("pointerdown",(e)=>{
     e.preventDefault(); e.stopPropagation();
-    const startY=e.clientY, startH=el.offsetHeight;
-    el.classList.add("sized"); el.classList.add("resizing");
-    const move=(ev)=>{ const nh=Math.max(120,startH+(ev.clientY-startY)); el.style.height=nh+"px"; };
-    const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); el.classList.remove("resizing"); w.h=el.offsetHeight; save(); };
+    const board=$("#board");
+    const m=board.style.gridTemplateColumns.match(/repeat\((\d+)/); const COLS=m?+m[1]:3;
+    const colW=(board.clientWidth-(COLS-1)*GRID_GAP)/COLS;
+    const rect=el.getBoundingClientRect();
+    el.classList.add("resizing");
+    const move=(ev)=>{
+      const wpx=ev.clientX-rect.left, hpx=ev.clientY-rect.top;
+      const nw=Math.min(COLS,Math.max(1,Math.round((wpx+GRID_GAP)/(colW+GRID_GAP))));
+      const nr=Math.max(6,Math.round((hpx+GRID_GAP)/(GRID_ROW+GRID_GAP)));
+      el.style.gridColumn=`span ${nw}`; el.style.gridRow=`span ${nr}`;
+      el.dataset.nw=nw; el.dataset.nr=nr;
+    };
+    const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); el.classList.remove("resizing"); if(el.dataset.nw) w.w=+el.dataset.nw; if(el.dataset.nr) w.rows=+el.dataset.nr; save(); };
     document.addEventListener("pointermove",move); document.addEventListener("pointerup",up);
   });
-  h.addEventListener("dblclick",(e)=>{ e.preventDefault(); e.stopPropagation(); delete w.h; save(); renderBoard(); });
+  h.addEventListener("dblclick",(e)=>{ e.preventDefault(); e.stopPropagation(); w.w=1; delete w.rows; save(); renderBoard(); });
   el.appendChild(h);
 }
 
@@ -839,37 +887,25 @@ async function loadRss(w,body){
   }catch(e){ body.innerHTML=`<div class="w-state err">Flux temporairement injoignable.</div><div style="text-align:center"><button class="w-cfg-btn">Réessayer</button></div>`; body.querySelector("button").onclick=()=>{ body.innerHTML=`<div class="w-state">Chargement…</div>`; loadRss(w,body); }; }
 }
 
-/* ============ DRAG & DROP ============ */
+/* ============ DRAG & DROP (flat reorder) ============ */
 let dragW=null;
 function setupDrag(w,el,handle){
   const h=handle.querySelector(".drag-handle");
   h.addEventListener("mousedown",()=>{ el.setAttribute("draggable","true"); });
   el.addEventListener("dragstart",(e)=>{ dragW=w; el.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",w.id);}catch(_){}} );
-  el.addEventListener("dragend",()=>{ el.classList.remove("dragging"); el.removeAttribute("draggable"); dragW=null; $$(".column").forEach(c=>c.classList.remove("dragover")); });
+  el.addEventListener("dragend",()=>{ el.classList.remove("dragging"); el.removeAttribute("draggable"); dragW=null; $$(".widget").forEach(x=>x.classList.remove("drop-before")); });
+  el.addEventListener("dragover",(e)=>{ if(!dragW||dragW===w) return; e.preventDefault(); el.classList.add("drop-before"); });
+  el.addEventListener("dragleave",(e)=>{ if(!el.contains(e.relatedTarget)) el.classList.remove("drop-before"); });
+  el.addEventListener("drop",(e)=>{ e.preventDefault(); el.classList.remove("drop-before"); if(!dragW||dragW===w) return; reorderWidget(dragW,w); });
 }
-function setupColumnDrop(col,ci){
-  col.addEventListener("dragover",(e)=>{ e.preventDefault(); col.classList.add("dragover"); });
-  col.addEventListener("dragleave",(e)=>{ if(!col.contains(e.relatedTarget)) col.classList.remove("dragover"); });
-  col.addEventListener("drop",(e)=>{
-    e.preventDefault(); col.classList.remove("dragover");
-    if(!dragW) return;
-    const page=activePage();
-    const after=getDragAfter(col,e.clientY);
-    // build new order for this column
-    dragW.col=ci;
-    const inCol=page.widgets.filter(x=>x.col===ci && x!==dragW).sort((a,b)=>(a.order||0)-(b.order||0));
-    let idx=inCol.length;
-    if(after){ const aid=after.dataset.id; const j=inCol.findIndex(x=>x.id===aid); if(j>=0) idx=j; }
-    inCol.splice(idx,0,dragW);
-    inCol.forEach((x,i)=>x.order=i);
-    save(); renderBoard();
-  });
-}
-function getDragAfter(col,y){
-  const els=[...col.querySelectorAll(".widget:not(.dragging)")];
-  let closest={off:-Infinity,el:null};
-  els.forEach(el=>{ const box=el.getBoundingClientRect(); const off=y-box.top-box.height/2; if(off<0 && off>closest.off){ closest={off,el}; } });
-  return closest.el;
+function reorderWidget(from,before){
+  const page=activePage();
+  const arr=[...page.widgets].sort((a,b)=>(a.order||0)-(b.order||0));
+  const fi=arr.indexOf(from); if(fi>=0) arr.splice(fi,1);
+  const bi=before?arr.indexOf(before):-1;
+  arr.splice(bi<0?arr.length:bi,0,from);
+  arr.forEach((x,i)=>x.order=i);
+  page.widgets=arr; save(); renderBoard();
 }
 
 /* ============ WIDGET ACTIONS ============ */
@@ -880,10 +916,6 @@ function removeWidget(w){
 }
 function addWidget(type){
   const page=activePage();
-  const cols=state.settings.columns;
-  // place in the shortest column
-  const counts=Array.from({length:cols},(_,i)=>page.widgets.filter(w=>w.col===i).length);
-  const col=counts.indexOf(Math.min(...counts));
   const defaults={
     bookmarks:{title:"Favoris",data:{links:[]}},
     notes:{title:"Notes",data:{text:""}},
@@ -892,7 +924,8 @@ function addWidget(type){
     crypto:{title:"Marchés",data:{coins:"bitcoin,ethereum",vs:"eur"}},
     rss:{title:"Actualités",data:{url:""}},
   }[type];
-  const w={id:uid(),type,title:defaults.title,col,order:page.widgets.filter(x=>x.col===col).length,data:defaults.data};
+  const maxOrder=Math.max(-1,...page.widgets.map(x=>x.order||0));
+  const w={id:uid(),type,title:defaults.title,w:1,order:maxOrder+1,data:defaults.data};
   page.widgets.push(w); save(); renderBoard();
   if(type==="weather") configWeather(w);
   if(type==="rss") configRss(w);

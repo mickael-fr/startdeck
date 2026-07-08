@@ -314,6 +314,9 @@ a{color:inherit;text-decoration:none}
 .io-row .btn{flex:1;min-width:130px;justify-content:center;display:flex;align-items:center;gap:7px}
 .io-row .btn svg{width:15px;height:15px}
 .store-note{font-size:.74rem;color:var(--muted2);margin-top:10px;display:flex;align-items:center;gap:7px}
+.sync-on{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--up);font-weight:600}
+.sync-on .dot{width:8px;height:8px;background:var(--up)}
+.err-msg{color:var(--down)}
 .store-note .dot{width:7px;height:7px}
 .store-note.ok .dot{background:var(--up)}
 .store-note.warn .dot{background:var(--accent)}
@@ -477,7 +480,68 @@ function defaultState(){
 }
 
 let state = Store.load() || defaultState();
-function save(){ Store.save(state); }
+function save(){ state._ts=Date.now(); Store.save(state); Sync.schedulePush(); }
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(_){} }
+
+const Sync = {
+  TOKEN:"startdeck_gh_token", GIST:"startdeck_gist_id",
+  FILE:"startdeck-sync.json", DESC:"StartDeck sync — ne pas supprimer",
+  token(){ return lsGet(this.TOKEN)||""; },
+  gist(){ return lsGet(this.GIST)||""; },
+  enabled(){ return !!this.token() && !!this.gist(); },
+  headers(t){ return {"Authorization":"Bearer "+(t||this.token()),"Accept":"application/vnd.github+json","Content-Type":"application/json","X-GitHub-Api-Version":"2022-11-28"}; },
+  async connect(token){
+    const r=await fetch("https://api.github.com/gists?per_page=100",{headers:this.headers(token)});
+    if(r.status===401||r.status===403) throw new Error("Jeton refusé. Vérifie qu'il a bien la permission « gist ».");
+    if(!r.ok) throw new Error("GitHub a répondu "+r.status+".");
+    const list=await r.json();
+    const g=Array.isArray(list)?list.find(x=>x.files&&x.files[this.FILE]):null;
+    lsSet(this.TOKEN,token);
+    if(g){ lsSet(this.GIST,g.id); return {found:true,id:g.id}; }
+    state._ts=Date.now(); Store.save(state);
+    const body=JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify(state)}}});
+    const cr=await fetch("https://api.github.com/gists",{method:"POST",headers:this.headers(token),body});
+    if(!cr.ok) throw new Error("Création du Gist échouée ("+cr.status+").");
+    const created=await cr.json(); lsSet(this.GIST,created.id);
+    return {found:false,id:created.id};
+  },
+  async pull(){
+    if(!this.enabled()) return null;
+    const r=await fetch("https://api.github.com/gists/"+this.gist(),{headers:this.headers()});
+    if(!r.ok) return null;
+    const g=await r.json(); const f=g.files&&g.files[this.FILE]; if(!f) return null;
+    let c=f.content; if(f.truncated&&f.raw_url){ try{ c=await (await fetch(f.raw_url)).text(); }catch(_){} }
+    try{ const o=JSON.parse(c); return (o&&o.pages)?o:null; }catch(_){ return null; }
+  },
+  async push(){
+    if(!this.enabled()) return false;
+    const body=JSON.stringify({files:{[this.FILE]:{content:JSON.stringify(state)}}});
+    const r=await fetch("https://api.github.com/gists/"+this.gist(),{method:"PATCH",headers:this.headers(),body});
+    return r.ok;
+  },
+  _pt:null,
+  schedulePush(){ if(!this.enabled())return; clearTimeout(this._pt); this._pt=setTimeout(()=>{ this.push().catch(()=>{}); },1500); },
+  _busy:false, _last:0,
+  async syncNow(silent){
+    if(!this.enabled()||this._busy) return;
+    this._busy=true;
+    try{
+      const remote=await this.pull();
+      if(remote && (remote._ts||0) > (state._ts||0)){
+        state=remote; Store.save(state); render();
+        if(!silent) toast("Synchronisé — données récupérées");
+      } else {
+        const ok=await this.push();
+        if(!silent) toast(ok?"Synchronisé — données envoyées":"Échec de la synchro");
+      }
+    }catch(_){ if(!silent) toast("Synchro impossible pour l'instant"); }
+    finally{ this._busy=false; this._last=Date.now(); }
+  },
+  disconnect(){ lsDel(this.TOKEN); lsDel(this.GIST); }
+};
 function activePage(){ return state.pages.find(p=>p.id===state.activePageId) || state.pages[0]; }
 
 /* ============ THEME / BACKGROUND ============ */
@@ -1193,6 +1257,10 @@ function openSettings(){
         <input type="file" id="file-html" accept=".html,text/html" hidden>
       </div>
       <div class="settings-sec">
+        <h4>Synchronisation multi-appareils</h4>
+        <div id="sync-box"></div>
+      </div>
+      <div class="settings-sec">
         <h4>Zone rouge</h4>
         <div class="io-row"><button class="btn danger" id="io-reset">Réinitialiser StartDeck</button></div>
       </div>
@@ -1222,6 +1290,35 @@ function openSettings(){
   }
   segHandler("#set-bgtype",v=>{ if(v==="theme") s.bg={type:"theme",value:""}; else if(!s.bg||s.bg.type!==v) s.bg={type:v,value:""}; applyTheme(); save(); renderBgExtra(); });
   renderBgExtra();
+
+  function renderSyncBox(){
+    const box=$("#sync-box"); if(!box) return;
+    if(Sync.enabled()){
+      box.innerHTML=`
+        <div class="sync-on"><span class="dot"></span> Connecté · sauvegarde partagée active</div>
+        <div class="hint" style="margin:6px 0 10px">Tes cartes se synchronisent entre tes appareils via un Gist GitHub privé. Modifie ici, rafraîchis là-bas.</div>
+        <div class="io-row">
+          <button class="btn primary" id="sync-now">↻ Synchroniser maintenant</button>
+          <button class="btn danger" id="sync-off">Déconnecter</button>
+        </div>`;
+      $("#sync-now").onclick=async()=>{ const b=$("#sync-now"); b.disabled=true; b.textContent="Synchronisation…"; await Sync.syncNow(false); renderSyncBox(); };
+      $("#sync-off").onclick=()=>{ Sync.disconnect(); toast("Synchro désactivée sur cet appareil"); renderSyncBox(); };
+    } else {
+      box.innerHTML=`
+        <div class="hint" style="margin-bottom:8px">Colle un jeton GitHub (permission « gist » uniquement) pour synchroniser tes cartes entre ton PC et ton iPhone. Le jeton reste stocké seulement sur cet appareil, jamais dans le dépôt.</div>
+        <div class="field" style="margin:0"><input type="text" id="sync-token" placeholder="ghp_… (jeton GitHub)" autocomplete="off" spellcheck="false"></div>
+        <div class="io-row" style="margin-top:10px"><button class="btn primary" id="sync-connect">Connecter</button></div>
+        <div class="hint err-msg" id="sync-msg" style="margin-top:8px"></div>`;
+      $("#sync-connect").onclick=async()=>{
+        const t=$("#sync-token").value.trim(); const msg=$("#sync-msg");
+        if(!t){ msg.textContent="Colle d'abord ton jeton."; return; }
+        const b=$("#sync-connect"); b.disabled=true; b.textContent="Connexion…"; msg.textContent="";
+        try{ const res=await Sync.connect(t); await Sync.syncNow(true); toast(res.found?"Connecté — données récupérées":"Connecté — sauvegarde créée"); renderSyncBox(); }
+        catch(err){ msg.textContent=err.message||"Échec de connexion."; b.disabled=false; b.textContent="Connecter"; }
+      };
+    }
+  }
+  renderSyncBox();
 
   // I/O
   $("#io-export").onclick=exportJSON;
@@ -1386,6 +1483,10 @@ setupSearch();
 render();
 tick(); setInterval(tick,1000);
 window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setTimeout(renderBoard,150); });
+// multi-device sync: pull on load and when returning to the tab
+if(Sync.enabled()){ Sync.syncNow(true); }
+window.addEventListener("focus",()=>{ if(Sync.enabled() && Date.now()-Sync._last>8000){ Sync.syncNow(true); } });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Sync.enabled() && Date.now()-Sync._last>8000){ Sync.syncNow(true); } });
 // periodic refresh of live widgets every 5 min
 setInterval(()=>{ $$(".widget").forEach(el=>{ const id=el.dataset.id; const w=activePage().widgets.find(x=>x.id===id); if(!w)return; if(w.type==="crypto")loadCrypto(w,el.querySelector(".widget-body")); if(w.type==="weather")loadWeather(w,el.querySelector(".widget-body")); }); },300000);
 </script>

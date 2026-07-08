@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>StartDeck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -142,6 +145,9 @@ a{color:inherit;text-decoration:none}
 .tab{display:flex;align-items:center;gap:7px;border:1px solid transparent;background:transparent;color:var(--muted);padding:8px 14px;border-radius:10px;font-size:.9rem;font-weight:500;transition:.15s}
 .tab:hover{color:var(--text);background:var(--surface)}
 .tab.active{color:var(--accent);background:var(--surface);border-color:var(--line)}
+.tab[draggable="true"]{cursor:grab}
+.tab.tab-dragging{opacity:.45}
+.tab.tab-over{box-shadow:-2px 0 0 var(--accent)}
 .tab .tab-x{opacity:0;font-size:1rem;line-height:1;color:var(--muted2);transition:.15s}
 .tab:hover .tab-x{opacity:.7}
 .tab .tab-x:hover{color:var(--down)}
@@ -155,7 +161,14 @@ a{color:inherit;text-decoration:none}
 .col-empty{border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted2);font-size:.85rem}
 
 /* ============ WIDGET ============ */
-.widget{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:border-color .15s,transform .05s}
+.widget{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:border-color .15s,transform .05s}
+.widget.sized{display:flex;flex-direction:column}
+.widget.sized .widget-body{flex:1;overflow-y:auto}
+.widget.resizing{transition:none;border-color:var(--accent)}
+.resize-h{position:absolute;right:4px;bottom:4px;width:18px;height:18px;display:grid;place-items:center;color:var(--muted2);cursor:ns-resize;border-radius:6px;opacity:0;transition:opacity .12s;touch-action:none;z-index:3}
+.widget:hover .resize-h{opacity:.8}
+.resize-h:hover{color:var(--accent);background:var(--surface2);opacity:1}
+.resize-h svg{width:14px;height:14px}
 .widget.dragging{opacity:.4}
 .widget-head{display:flex;align-items:center;gap:8px;padding:11px 12px 11px 8px;border-bottom:1px solid var(--line)}
 .drag-handle{cursor:grab;color:var(--muted2);display:grid;place-items:center;width:24px;height:24px;flex:none;border-radius:6px}
@@ -484,20 +497,38 @@ function renderHeader(){
   $("#session").style.display=state.settings.showSession?"":"none";
 }
 
+let dragPage=null;
+function reorderPages(fromId,toId){
+  const arr=state.pages;
+  const from=arr.findIndex(p=>p.id===fromId);
+  if(from<0) return;
+  const [moved]=arr.splice(from,1);
+  const to=toId ? arr.findIndex(p=>p.id===toId) : arr.length;
+  arr.splice(to<0?arr.length:to,0,moved);
+  save(); renderTabs();
+}
 function renderTabs(){
   const t=$("#tabs"); t.innerHTML="";
   state.pages.forEach(p=>{
     const b=document.createElement("button");
     b.className="tab"+(p.id===state.activePageId?" active":"");
+    b.draggable=true; b.dataset.pid=p.id;
     b.innerHTML=`<span>${esc(p.name)}</span><span class="tab-x" title="Supprimer la page">×</span>`;
     b.querySelector("span:first-child").onclick=()=>{ state.activePageId=p.id; save(); render(); };
     b.querySelector("span:first-child").ondblclick=(e)=>{ e.stopPropagation(); renamePage(p); };
     b.querySelector(".tab-x").onclick=(e)=>{ e.stopPropagation(); deletePage(p); };
+    b.addEventListener("dragstart",(e)=>{ dragPage=p.id; b.classList.add("tab-dragging"); e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",p.id);}catch(_){}} );
+    b.addEventListener("dragend",()=>{ b.classList.remove("tab-dragging"); dragPage=null; $$(".tab").forEach(x=>x.classList.remove("tab-over")); });
+    b.addEventListener("dragover",(e)=>{ e.preventDefault(); if(dragPage&&dragPage!==p.id) b.classList.add("tab-over"); });
+    b.addEventListener("dragleave",()=>b.classList.remove("tab-over"));
+    b.addEventListener("drop",(e)=>{ e.preventDefault(); b.classList.remove("tab-over"); if(dragPage&&dragPage!==p.id) reorderPages(dragPage,p.id); });
     t.appendChild(b);
   });
   const add=document.createElement("button");
   add.className="tab-add"; add.textContent="+"; add.title="Nouvelle page";
   add.onclick=addPage;
+  add.addEventListener("dragover",(e)=>e.preventDefault());
+  add.addEventListener("drop",(e)=>{ e.preventDefault(); if(dragPage) reorderPages(dragPage,null); });
   t.appendChild(add);
 }
 
@@ -564,15 +595,35 @@ const IC={
 };
 
 function renderWidget(w){
+  let el;
   switch(w.type){
-    case "bookmarks": return renderBookmarks(w);
-    case "notes": return renderNotes(w);
-    case "tasks": return renderTasks(w);
-    case "weather": return renderWeather(w);
-    case "crypto": return renderCrypto(w);
-    case "rss": return renderRss(w);
-    default: return renderNotes(w);
+    case "bookmarks": el=renderBookmarks(w); break;
+    case "notes": el=renderNotes(w); break;
+    case "tasks": el=renderTasks(w); break;
+    case "weather": el=renderWeather(w); break;
+    case "crypto": el=renderCrypto(w); break;
+    case "rss": el=renderRss(w); break;
+    default: el=renderNotes(w);
   }
+  if(w.h){ el.classList.add("sized"); el.style.height=w.h+"px"; }
+  addResizeHandle(w,el);
+  return el;
+}
+
+function addResizeHandle(w,el){
+  const h=document.createElement("div");
+  h.className="resize-h"; h.title="Glisser pour ajuster la hauteur · double-clic pour réinitialiser";
+  h.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 18h8M10 22h4"/></svg>';
+  h.addEventListener("pointerdown",(e)=>{
+    e.preventDefault(); e.stopPropagation();
+    const startY=e.clientY, startH=el.offsetHeight;
+    el.classList.add("sized"); el.classList.add("resizing");
+    const move=(ev)=>{ const nh=Math.max(120,startH+(ev.clientY-startY)); el.style.height=nh+"px"; };
+    const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); el.classList.remove("resizing"); w.h=el.offsetHeight; save(); };
+    document.addEventListener("pointermove",move); document.addEventListener("pointerup",up);
+  });
+  h.addEventListener("dblclick",(e)=>{ e.preventDefault(); e.stopPropagation(); delete w.h; save(); renderBoard(); });
+  el.appendChild(h);
 }
 
 /* --- bookmarks --- */

@@ -825,66 +825,84 @@ function renderRss(w){
   el.appendChild(body); setupDrag(w,el,head);
   loadRss(w,body); return el;
 }
+function fetchT(url,ms){
+  return new Promise((res)=>{
+    const c=new AbortController(); const t=setTimeout(()=>{try{c.abort();}catch(_){}} ,ms||9000);
+    fetch(url,{signal:c.signal}).then(r=>{clearTimeout(t);res(r);}).catch(()=>{clearTimeout(t);res(null);});
+  });
+}
 async function loadRss(w,body){
   if(!w.data.url){ body.innerHTML=`<div class="w-state">Aucun flux défini.</div><div style="text-align:center"><button class="w-cfg-btn">Ajouter un flux RSS</button></div>`; body.querySelector("button").onclick=()=>configRss(w); return; }
   const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   const keys=(w.data.filter||"").split(",").map(k=>norm(k.trim())).filter(Boolean);
+  const strip=s=>(s||"").replace(/<[^>]+>/g,"").replace(/\s+/g," ").trim();
+  let rows=null, src=domain(w.data.url);
+  // 1) rss2json : service spécialisé RSS, fiable, renvoie du JSON (+ catégories)
   try{
+    const r=await fetchT("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(w.data.url),9000);
+    if(r&&r.ok){
+      const j=await r.json();
+      if(j&&j.status==="ok"&&Array.isArray(j.items)&&j.items.length){
+        if(j.feed&&j.feed.title) src=j.feed.title;
+        rows=j.items.map(it=>({title:strip(it.title),link:it.link||it.guid||"#",desc:strip(it.description||it.content),cat:((it.categories&&it.categories[0])||"").trim()}));
+      }
+    }
+  }catch(_){}
+  // 2) secours : proxys CORS + parsing XML
+  if(!rows){
     const proxies=[
-      u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
       u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
+      u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
       u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
     ];
-    let items=null,doc=null;
     for(const mkurl of proxies){
-      try{
-        const r=await fetch(mkurl(w.data.url));
-        if(!r.ok) continue;
-        const txt=await r.text();
-        if(!txt||txt.length<50) continue;
-        const d=new DOMParser().parseFromString(txt,"text/xml");
-        let it=[...d.querySelectorAll("item")];
-        if(!it.length) it=[...d.querySelectorAll("entry")];
-        if(it.length){ items=it; doc=d; break; }
-      }catch(_){}
-    }
-    if(!items) throw new Error("all proxies failed");
-    const src=(doc.querySelector("channel > title")||doc.querySelector("feed > title"))?.textContent||domain(w.data.url);
-    let rows=items.map(it=>{
-      const title=(it.querySelector("title")?.textContent||"").trim();
-      let link=it.querySelector("link")?.textContent?.trim();
-      if(!link){ const l=it.querySelector("link"); link=l?.getAttribute("href")||"#"; }
-      const desc=(it.querySelector("description")?.textContent||it.querySelector("summary")?.textContent||"").trim();
-      const catEl=it.querySelector("category");
-      const cat=(catEl?.textContent||catEl?.getAttribute("term")||"").trim();
-      return {title,link,desc,cat};
-    });
-    if(keys.length){ rows=rows.filter(it=>{ const hay=norm(it.title+" "+it.desc); return keys.some(k=>hay.includes(k)); }); }
-    if(!rows.length){
-      body.innerHTML=`<div class="w-state">Aucun titre ne correspond à tes mots-clés pour l'instant.</div><div style="text-align:center"><button class="w-cfg-btn">Modifier le filtre</button></div>`;
-      body.querySelector("button").onclick=()=>configRss(w); return;
-    }
-    const rowHtml=r=>`<a class="rss-item" href="${esc(r.link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(r.title)}</div></a>`;
-    let html="";
-    const hasCats = rows.some(r=>r.cat);
-    if(w.data.display==="cat" && hasCats){
-      const groups={}, order=[];
-      rows.forEach(r=>{ const g=r.cat||"Divers"; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(r); });
-      order.sort((a,b)=>groups[b].length-groups[a].length);
-      order.forEach(g=>{
-        html+=`<div class="rss-cat">${esc(g)}</div><div class="rss-list">`;
-        groups[g].slice(0,6).forEach(r=>{ html+=rowHtml(r); });
-        html+="</div>";
+      const r=await fetchT(mkurl(w.data.url),9000);
+      if(!r||!r.ok) continue;
+      let txt=""; try{ txt=await r.text(); }catch(_){ continue; }
+      if(!txt||txt.length<50) continue;
+      const d=new DOMParser().parseFromString(txt,"text/xml");
+      let it=[...d.querySelectorAll("item")];
+      if(!it.length) it=[...d.querySelectorAll("entry")];
+      if(!it.length) continue;
+      const st=(d.querySelector("channel > title")||d.querySelector("feed > title"))?.textContent; if(st) src=st;
+      rows=it.map(x=>{
+        const title=(x.querySelector("title")?.textContent||"").trim();
+        let link=x.querySelector("link")?.textContent?.trim();
+        if(!link){ const l=x.querySelector("link"); link=l?.getAttribute("href")||"#"; }
+        const desc=strip(x.querySelector("description")?.textContent||x.querySelector("summary")?.textContent);
+        const catEl=x.querySelector("category");
+        const cat=(catEl?.textContent||catEl?.getAttribute("term")||"").trim();
+        return {title,link,desc,cat};
       });
-    } else {
-      if(w.data.display==="cat"){ html+=`<div class="w-state" style="padding:8px 6px 4px;text-align:left">Ce flux ne renvoie pas de catégories — affichage en liste. (Astuce : un flux « par rubrique » donne un vrai classement.)</div>`; }
-      html+='<div class="rss-list">';
-      rows.slice(0,10).forEach(r=>{ html+=`<a class="rss-item" href="${esc(r.link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(r.title)}</div><div class="rss-src">${esc(src)}</div></a>`; });
-      html+="</div>";
+      break;
     }
-    if(keys.length){ html+=`<div class="task-foot"><span class="task-count">Filtré · ${esc(w.data.filter)}</span></div>`; }
-    body.innerHTML=html;
-  }catch(e){ body.innerHTML=`<div class="w-state err">Flux temporairement injoignable.</div><div style="text-align:center"><button class="w-cfg-btn">Réessayer</button></div>`; body.querySelector("button").onclick=()=>{ body.innerHTML=`<div class="w-state">Chargement…</div>`; loadRss(w,body); }; }
+  }
+  if(!rows){ body.innerHTML=`<div class="w-state err">Flux temporairement injoignable.</div><div style="text-align:center"><button class="w-cfg-btn">Réessayer</button></div>`; body.querySelector("button").onclick=()=>{ body.innerHTML=`<div class="w-state">Chargement…</div>`; loadRss(w,body); }; return; }
+  if(keys.length){ rows=rows.filter(it=>{ const hay=norm(it.title+" "+it.desc); return keys.some(k=>hay.includes(k)); }); }
+  if(!rows.length){
+    body.innerHTML=`<div class="w-state">Aucun titre ne correspond à tes mots-clés pour l'instant.</div><div style="text-align:center"><button class="w-cfg-btn">Modifier le filtre</button></div>`;
+    body.querySelector("button").onclick=()=>configRss(w); return;
+  }
+  const rowHtml=r=>`<a class="rss-item" href="${esc(r.link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(r.title)}</div></a>`;
+  let html="";
+  const hasCats = rows.some(r=>r.cat);
+  if(w.data.display==="cat" && hasCats){
+    const groups={}, order=[];
+    rows.forEach(r=>{ const g=r.cat||"Divers"; if(!groups[g]){groups[g]=[];order.push(g);} groups[g].push(r); });
+    order.sort((a,b)=>groups[b].length-groups[a].length);
+    order.forEach(g=>{
+      html+=`<div class="rss-cat">${esc(g)}</div><div class="rss-list">`;
+      groups[g].slice(0,6).forEach(r=>{ html+=rowHtml(r); });
+      html+="</div>";
+    });
+  } else {
+    if(w.data.display==="cat"){ html+=`<div class="w-state" style="padding:8px 6px 4px;text-align:left">Ce flux ne renvoie pas de catégories — affichage en liste. (Astuce : un flux « par rubrique » donne un vrai classement.)</div>`; }
+    html+='<div class="rss-list">';
+    rows.slice(0,10).forEach(r=>{ html+=`<a class="rss-item" href="${esc(r.link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(r.title)}</div><div class="rss-src">${esc(src)}</div></a>`; });
+    html+="</div>";
+  }
+  if(keys.length){ html+=`<div class="task-foot"><span class="task-count">Filtré · ${esc(w.data.filter)}</span></div>`; }
+  body.innerHTML=html;
 }
 
 /* ============ DRAG & DROP (flat reorder) ============ */

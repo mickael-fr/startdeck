@@ -86,6 +86,12 @@ a{color:inherit;text-decoration:none}
 
 .clockcard{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end}
 .localclock{text-align:right}
+.hdr-wx{display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:9px 16px;box-shadow:var(--shadow);color:var(--text);min-width:148px;transition:.15s;font-family:inherit}
+.hdr-wx:hover{border-color:var(--line2);background:var(--surface2)}
+.hdr-wx-icon{font-size:1.85rem;line-height:1}
+.hdr-wx-main{display:flex;flex-direction:column;align-items:flex-start;line-height:1.12}
+.hdr-wx-temp{font-family:var(--font-mono);font-weight:600;font-size:1.5rem;letter-spacing:.01em}
+.hdr-wx-place{font-size:.78rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .localclock .t{font-family:var(--font-mono);font-weight:600;font-size:1.9rem;letter-spacing:.01em;line-height:1;text-shadow:0 0 24px var(--accent-glow)}
 .localclock .d{color:var(--muted);font-size:.78rem;text-transform:capitalize;margin-top:3px}
 
@@ -358,17 +364,13 @@ a{color:inherit;text-decoration:none}
       <div class="subgreet" id="subgreet"></div>
     </div>
     <div class="clockcard">
-      <div class="session" id="session">
-        <div class="session-top">
-          <span class="session-label"><span class="dot"></span> Session New York</span>
-          <span class="session-ny" id="ny-time">--:--</span>
-        </div>
-        <div class="session-mid">
-          <span class="session-state" id="session-state">—</span>
-          <span class="session-count" id="session-count"></span>
-        </div>
-        <div class="session-flag" id="session-flag">◆ Fenêtre optimale · rotation des C</div>
-      </div>
+      <button class="hdr-wx" id="hdr-wx" title="Météo · cliquer pour changer de lieu">
+        <span class="hdr-wx-icon" id="hdr-wx-icon">🌤️</span>
+        <span class="hdr-wx-main">
+          <span class="hdr-wx-temp" id="hdr-wx-temp">—°</span>
+          <span class="hdr-wx-place" id="hdr-wx-place">Météo</span>
+        </span>
+      </button>
       <div class="localclock">
         <div class="t" id="clock">--:--</div>
         <div class="d" id="date"></div>
@@ -571,7 +573,59 @@ function renderHeader(){
   const g = h<6?"Bonne nuit": h<12?"Bonjour": h<18?"Bon après-midi":"Bonsoir";
   const nm=(state.settings.name||"").trim();
   $("#greet").innerHTML = nm ? `${g}, <b>${esc(nm)}</b>` : g;
-  $("#session").style.display=state.settings.showSession?"":"none";
+  renderHeaderWeather();
+}
+
+/* Header weather (top-right, replaces the old NY session card) */
+function migrateWeatherToHeader(){
+  const s=state.settings;
+  if(s.wxMigrated) return;
+  // pull the location from an existing Météo board widget, then remove those cards
+  let loc=null;
+  state.pages.forEach(p=>{ p.widgets.forEach(w=>{ if(w.type==="weather" && w.data && w.data.lat!=null && !loc) loc={place:w.data.place,lat:w.data.lat,lon:w.data.lon}; }); });
+  state.pages.forEach(p=>{ p.widgets=p.widgets.filter(w=>w.type!=="weather"); });
+  s.wx = loc || s.wx || {place:"Paris",lat:48.85,lon:2.35};
+  s.wxMigrated=true;
+  save();
+}
+async function renderHeaderWeather(){
+  const btn=$("#hdr-wx"); if(!btn) return;
+  const wx=state.settings.wx;
+  if(!wx||wx.lat==null){ $("#hdr-wx-icon").textContent="🌡️"; $("#hdr-wx-temp").textContent="—°"; $("#hdr-wx-place").textContent="Choisir un lieu"; return; }
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${wx.lat}&longitude=${wx.lon}&current=temperature_2m,weather_code&timezone=auto`;
+    const r=await fetch(url); const j=await r.json();
+    const code=WMO[j.current.weather_code]||["❓",""];
+    $("#hdr-wx-icon").textContent=code[0];
+    $("#hdr-wx-temp").textContent=Math.round(j.current.temperature_2m)+"°";
+    $("#hdr-wx-place").textContent=wx.place||"";
+    btn.title=`${code[1]} · ${wx.place||""} — cliquer pour changer de lieu`;
+  }catch(e){ $("#hdr-wx-temp").textContent="—°"; $("#hdr-wx-place").textContent=wx.place||"Météo"; }
+}
+function configHeaderWeather(){
+  openModal(`
+    <div class="modal-head"><h3>Météo de l'en-tête</h3><button class="icon-btn" id="mx">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Ville</label><input type="text" id="hwx-city" value="${esc(state.settings.wx?.place||"")}" placeholder="Bordeaux"><div class="hint">Tape une ville puis Rechercher, ou utilise ta position.</div></div>
+      <div id="hwx-results"></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" id="hwx-geo">📍 Ma position</button><button class="btn primary" id="hwx-search">Rechercher</button></div>`);
+  $("#mx").onclick=closeModal;
+  const inp=$("#hwx-city"); setTimeout(()=>inp.focus(),0);
+  const setLoc=(place,lat,lon)=>{ state.settings.wx={place,lat,lon}; state.settings.wxMigrated=true; save(); renderHeaderWeather(); closeModal(); };
+  const doSearch=async()=>{
+    const q=inp.value.trim(); if(!q) return;
+    const res=$("#hwx-results"); res.innerHTML='<div class="w-state">Recherche…</div>';
+    try{
+      const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=fr`);
+      const j=await r.json();
+      if(!j.results){ res.innerHTML='<div class="w-state">Aucun résultat.</div>'; return; }
+      res.innerHTML='<div class="links">'+j.results.map((c,i)=>`<button class="link" data-i="${i}" style="width:100%;text-align:left"><span class="link-name">${esc(c.name)}${c.admin1?", "+esc(c.admin1):""} · ${esc(c.country_code)}</span></button>`).join("")+"</div>";
+      $$("#hwx-results .link").forEach(b=>b.onclick=()=>{ const c=j.results[+b.dataset.i]; setLoc(c.name,c.latitude,c.longitude); });
+    }catch(e){ res.innerHTML='<div class="w-state err">Erreur de recherche.</div>'; }
+  };
+  $("#hwx-search").onclick=doSearch; inp.onkeydown=(e)=>{ if(e.key==="Enter") doSearch(); };
+  $("#hwx-geo").onclick=()=>{ if(!navigator.geolocation){ toast("Géolocalisation indisponible"); return; } navigator.geolocation.getCurrentPosition(pos=>setLoc("Ma position",+pos.coords.latitude.toFixed(3),+pos.coords.longitude.toFixed(3)),()=>toast("Position refusée")); };
 }
 
 let dragPage=null;
@@ -1237,8 +1291,8 @@ function openSettings(){
           <div class="seg" id="set-engine">${Object.entries(ENGINES).map(([k,v])=>`<button data-v="${k}" class="${s.engine===k?"on":""}">${v.label}</button>`).join("")}</div></div>
         <div class="field"><label>Colonnes</label>
           <div class="seg" id="set-cols">${[2,3,4].map(n=>`<button data-v="${n}" class="${s.columns===n?"on":""}">${n}</button>`).join("")}</div></div>
-        <div class="field"><label>Horloge session New York (ouverture NY que tu trades)</label>
-          <div class="seg" id="set-session"><button data-v="1" class="${s.showSession?"on":""}">Affichée</button><button data-v="0" class="${!s.showSession?"on":""}">Masquée</button></div></div>
+        <div class="field"><label>Météo (en-tête, en haut à droite)</label>
+          <div class="io-row"><button class="btn" id="set-wx">📍 ${esc(state.settings.wx?.place||"Choisir un lieu")} — changer</button></div></div>
       </div>
       <div class="settings-sec">
         <h4>Apparence</h4>
@@ -1283,7 +1337,7 @@ function openSettings(){
   $("#set-name").oninput=(e)=>{ s.name=e.target.value; renderHeader(); save(); };
   segHandler("#set-engine",v=>{ s.engine=v; applyTheme(); save(); });
   segHandler("#set-cols",v=>{ s.columns=+v; save(); renderBoard(); });
-  segHandler("#set-session",v=>{ s.showSession=v==="1"; renderHeader(); save(); });
+  $("#set-wx").onclick=configHeaderWeather;
   segHandler("#set-theme",v=>{ s.theme=v; applyTheme(); save(); });
   $$("#set-accent .swatch").forEach(sw=>sw.onclick=()=>{ s.accent=sw.dataset.v; $$("#set-accent .swatch").forEach(x=>x.classList.remove("on")); sw.classList.add("on"); applyTheme(); save(); });
 
@@ -1458,42 +1512,16 @@ function tick(){
   const p=n=>String(n).padStart(2,"0");
   $("#clock").textContent = s.clock24 ? `${p(hh)}:${p(mm)}` : `${((hh%12)||12)}:${p(mm)} ${hh<12?"AM":"PM"}`;
   $("#date").textContent = now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
-  // NY session
-  const ny=new Date(now.toLocaleString("en-US",{timeZone:"America/New_York"}));
-  const day=ny.getDay(); const mins=ny.getHours()*60+ny.getMinutes();
-  $("#ny-time").textContent=`${p(ny.getHours())}:${p(ny.getMinutes())} ET`;
-  const wd = day>=1&&day<=5;
-  const open=570, close=960, gStart=630, gEnd=660; // 09:30–16:00, golden 10:30–11:00
-  const isOpen = wd && mins>=open && mins<close;
-  const isGolden = isOpen && mins>=gStart && mins<gEnd;
-  const sess=$("#session"), st=$("#session-state"), cnt=$("#session-count");
-  sess.classList.toggle("open",isOpen); sess.classList.toggle("golden",isGolden);
-  st.classList.toggle("open",isOpen);
-  const fmtDur=(totMin)=>{ const h=Math.floor(totMin/60), m=totMin%60; const sec=59-ss; return `${p(h)}:${p(m)}:${p(sec)}`; };
-  if(isOpen){
-    st.textContent="Ouvert";
-    const rem=close-mins-1;
-    cnt.textContent="Ferme dans "+fmtDur(rem);
-  } else {
-    st.textContent="Fermé";
-    // minutes until next open
-    let addDays=0, target=open;
-    if(wd && mins<open){ addDays=0; }
-    else { // find next weekday
-      let d=day; let cnt2=1;
-      while(true){ d=(d+1)%7; if(d>=1&&d<=5){ break; } cnt2++; }
-      addDays=cnt2;
-    }
-    const rem=addDays*1440 + (open-mins) - 1;
-    cnt.textContent="Ouvre dans "+fmtDur(rem<0?0:rem);
-  }
 }
 
 /* ============ BOOT ============ */
 $("#btn-settings").onclick=openSettings;
+$("#hdr-wx").onclick=configHeaderWeather;
+migrateWeatherToHeader();
 setupSearch();
 render();
 tick(); setInterval(tick,1000);
+setInterval(renderHeaderWeather,600000);
 window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setTimeout(renderBoard,150); });
 // multi-device sync: pull on load and when returning to the tab
 if(Sync.enabled()){ Sync.syncNow(true); }

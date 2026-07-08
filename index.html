@@ -205,6 +205,13 @@ a{color:inherit;text-decoration:none}
 .link-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
 .link-edit{opacity:0;border:none;background:transparent;color:var(--muted2);width:24px;height:24px;border-radius:6px;flex:none}
 .link:hover .link-edit{opacity:1}
+.link-grip{width:15px;display:grid;place-items:center;color:var(--muted2);cursor:grab;opacity:0;transition:opacity .12s;flex:none;margin:0 -3px 0 -4px}
+.link:hover .link-grip{opacity:.5}
+.link-grip:hover{opacity:1;color:var(--muted)}
+.link-grip:active{cursor:grabbing}
+.link-grip svg{width:14px;height:14px}
+.link.ldrag{opacity:.4}
+.link.lover{box-shadow:inset 0 2px 0 var(--accent)}
 .link-edit:hover{color:var(--text);background:var(--line)}
 .add-link{display:flex;align-items:center;gap:9px;width:100%;border:1px dashed var(--line2);background:transparent;color:var(--muted);padding:9px;border-radius:9px;font-size:.85rem;margin-top:4px;transition:.12s}
 .add-link svg{width:16px;height:16px;flex:none}
@@ -758,6 +765,7 @@ const IC={
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  grip:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>',
   app:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
 };
 
@@ -809,20 +817,33 @@ function renderBookmarks(w){
   el.appendChild(head);
   const body=document.createElement("div"); body.className="widget-body";
   const list=document.createElement("div"); list.className="links";
-  (w.data.links||[]).forEach(lk=>{
-    const web=isWebUrl(lk.url);
-    const a=document.createElement("a"); a.className="link"+(web?"":" applink"); a.href=lk.url;
-    if(web){ a.target="_blank"; a.rel="noopener"; }
-    const fav=web?favicon(lk.url):"";
-    const letter=esc((lk.name||'?')[0]||'?').toUpperCase();
-    const img = !web
-      ? `<span class="fav-fallback app" title="Lance une application">${IC.app}</span>`
-      : (fav ? `<img src="${fav}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fav-fallback',textContent:'${letter}'}))">`
-             : `<span class="fav-fallback">${letter}</span>`);
-    a.innerHTML=`${img}<span class="link-name">${esc(lk.name||lk.url)}</span><button class="link-edit" title="Modifier">${IC.edit}</button>`;
-    a.querySelector(".link-edit").onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); editLink(w,lk); };
-    list.appendChild(a);
-  });
+  let dragLink=null;
+  function populate(){
+    list.innerHTML="";
+    (w.data.links||[]).forEach(lk=>{
+      const web=isWebUrl(lk.url);
+      const a=document.createElement("a"); a.className="link"+(web?"":" applink"); a.href=lk.url; a.draggable=false;
+      if(web){ a.target="_blank"; a.rel="noopener"; }
+      const fav=web?favicon(lk.url):"";
+      const letter=esc((lk.name||'?')[0]||'?').toUpperCase();
+      const img = !web
+        ? `<span class="fav-fallback app" title="Lance une application">${IC.app}</span>`
+        : (fav ? `<img src="${fav}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fav-fallback',textContent:'${letter}'}))">`
+               : `<span class="fav-fallback">${letter}</span>`);
+      a.innerHTML=`<span class="link-grip" title="Glisser pour réordonner">${IC.grip}</span>${img}<span class="link-name">${esc(lk.name||lk.url)}</span><button class="link-edit" title="Modifier">${IC.edit}</button>`;
+      a.querySelector(".link-edit").onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); editLink(w,lk); };
+      const grip=a.querySelector(".link-grip");
+      grip.addEventListener("mousedown",(e)=>{ e.stopPropagation(); a.draggable=true; });
+      grip.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); });
+      a.addEventListener("dragstart",(e)=>{ dragLink=lk; a.classList.add("ldrag"); e.dataTransfer.effectAllowed="move"; e.stopPropagation(); try{e.dataTransfer.setData("text/plain",lk.id||"");}catch(_){}} );
+      a.addEventListener("dragend",(e)=>{ e.stopPropagation(); a.classList.remove("ldrag"); a.draggable=false; dragLink=null; $$(".link",list).forEach(x=>x.classList.remove("lover")); });
+      a.addEventListener("dragover",(e)=>{ if(!dragLink||dragLink===lk) return; e.preventDefault(); e.stopPropagation(); a.classList.add("lover"); });
+      a.addEventListener("dragleave",()=>a.classList.remove("lover"));
+      a.addEventListener("drop",(e)=>{ e.preventDefault(); e.stopPropagation(); a.classList.remove("lover"); if(!dragLink||dragLink===lk) return; const arr=w.data.links; const fi=arr.indexOf(dragLink); if(fi>=0) arr.splice(fi,1); const ti=arr.indexOf(lk); arr.splice(ti<0?arr.length:ti,0,dragLink); save(); populate(); });
+      list.appendChild(a);
+    });
+  }
+  populate();
   body.appendChild(list);
   const add=document.createElement("button"); add.className="add-link"; add.innerHTML=`${IC.plus} <span>Ajouter un lien</span>`;
   add.onclick=()=>editLink(w,null);
@@ -956,7 +977,7 @@ function renderRss(w){
 function fetchT(url,ms){
   return new Promise((res)=>{
     const c=new AbortController(); const t=setTimeout(()=>{try{c.abort();}catch(_){}} ,ms||9000);
-    fetch(url,{signal:c.signal}).then(r=>{clearTimeout(t);res(r);}).catch(()=>{clearTimeout(t);res(null);});
+    fetch(url,{signal:c.signal,cache:"no-store"}).then(r=>{clearTimeout(t);res(r);}).catch(()=>{clearTimeout(t);res(null);});
   });
 }
 async function loadRss(w,body){
@@ -967,7 +988,7 @@ async function loadRss(w,body){
   let rows=null, src=domain(w.data.url);
   // 1) rss2json : service spécialisé RSS, fiable, renvoie du JSON (+ catégories)
   try{
-    const r=await fetchT("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(w.data.url),9000);
+    const r=await fetchT("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(w.data.url)+"&_="+Date.now(),9000);
     if(r&&r.ok){
       const j=await r.json();
       if(j&&j.status==="ok"&&Array.isArray(j.items)&&j.items.length){
@@ -984,7 +1005,7 @@ async function loadRss(w,body){
       u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
     ];
     for(const mkurl of proxies){
-      const r=await fetchT(mkurl(w.data.url),9000);
+      const r=await fetchT(mkurl(w.data.url)+"&_="+Date.now(),9000);
       if(!r||!r.ok) continue;
       let txt=""; try{ txt=await r.text(); }catch(_){ continue; }
       if(!txt||txt.length<50) continue;
@@ -1033,7 +1054,10 @@ async function loadRss(w,body){
     rows.slice(0,10).forEach(r=>{ html+=rowHtml(r,true); });
     html+="</div>";
   }
-  if(keys.length){ html+=`<div class="task-foot"><span class="task-count">Filtré · ${esc(w.data.filter)}</span></div>`; }
+  const upd=new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  let foot="Actualisé à "+upd;
+  if(keys.length) foot="Filtré · "+esc(w.data.filter)+" — "+foot;
+  html+=`<div class="task-foot"><span class="task-count">${foot}</span></div>`;
   body.innerHTML=html;
   $$(".rss-item",body).forEach(a=>a.addEventListener("click",(e)=>{
     if(e.ctrlKey||e.metaKey||e.button===1||e.shiftKey) return; // laisse ouvrir en onglet
@@ -1527,8 +1551,15 @@ window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setT
 if(Sync.enabled()){ Sync.syncNow(true); }
 window.addEventListener("focus",()=>{ if(Sync.enabled() && Date.now()-Sync._last>8000){ Sync.syncNow(true); } });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Sync.enabled() && Date.now()-Sync._last>8000){ Sync.syncNow(true); } });
-// periodic refresh of live widgets every 5 min
-setInterval(()=>{ $$(".widget").forEach(el=>{ const id=el.dataset.id; const w=activePage().widgets.find(x=>x.id===id); if(!w)return; if(w.type==="crypto")loadCrypto(w,el.querySelector(".widget-body")); if(w.type==="weather")loadWeather(w,el.querySelector(".widget-body")); }); },300000);
+// periodic refresh of live widgets (news + markets + weather)
+let _lastFeeds=Date.now();
+function refreshFeeds(){
+  $$(".widget").forEach(el=>{ const id=el.dataset.id; const w=activePage().widgets.find(x=>x.id===id); if(!w)return; const b=el.querySelector(".widget-body"); if(!b)return; if(w.type==="crypto")loadCrypto(w,b); else if(w.type==="weather")loadWeather(w,b); else if(w.type==="rss")loadRss(w,b); });
+  _lastFeeds=Date.now();
+}
+setInterval(refreshFeeds,300000);
+window.addEventListener("focus",()=>{ if(Date.now()-_lastFeeds>120000) refreshFeeds(); });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Date.now()-_lastFeeds>120000) refreshFeeds(); });
 </script>
 </body>
 </html>

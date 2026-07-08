@@ -323,18 +323,16 @@ a{color:inherit;text-decoration:none}
 
 /* toast */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--line2);color:var(--text);padding:11px 18px;border-radius:11px;box-shadow:0 12px 30px rgba(0,0,0,.4);font-size:.88rem;z-index:200;opacity:0;pointer-events:none;transition:.25s}
-#reader{position:fixed;top:0;right:0;bottom:0;width:clamp(300px,32vw,450px);background:var(--surface);border-left:1px solid var(--line2);box-shadow:-14px 0 44px rgba(0,0,0,.42);transform:translateX(102%);transition:transform .22s ease;z-index:95;display:flex;flex-direction:column}
-#reader.show{transform:none}
-.reader-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);flex:none}
-.reader-src{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.reader-body{padding:18px 18px 30px;overflow-y:auto}
-.reader-title{font-family:var(--font-display);font-size:1.32rem;line-height:1.24;letter-spacing:-.01em;margin:0 0 10px}
+.reader-tile{border-color:var(--line2);box-shadow:0 0 0 1px var(--accent-soft), var(--shadow)}
+.reader-tile .widget-head{flex:none}
+.reader-src{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.reader-scroll{padding:16px 18px 22px}
+.reader-title{font-family:var(--font-display);font-size:1.35rem;line-height:1.24;letter-spacing:-.01em;margin:0 0 10px}
 .reader-date{font-size:.78rem;color:var(--muted2);margin-bottom:14px}
-.reader-img{width:100%;border-radius:12px;margin-bottom:16px;display:block}
-.reader-desc{color:var(--text);font-size:.96rem;line-height:1.62;margin:0 0 16px}
+.reader-img{width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:16px;display:block}
+.reader-desc{color:var(--text);font-size:.97rem;line-height:1.62;margin:0 0 16px}
 .reader-note{font-size:.74rem;color:var(--muted2);background:var(--surface2);border-radius:9px;padding:10px 12px;margin-bottom:18px}
-.reader-open{display:block;text-align:center}
-@media (max-width:640px){#reader{width:100%}}
+.reader-open{display:inline-block;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* footer credit */
@@ -985,23 +983,35 @@ async function loadRss(w,body){
   body.innerHTML=html;
   $$(".rss-item",body).forEach(a=>a.addEventListener("click",(e)=>{
     if(e.ctrlKey||e.metaKey||e.button===1||e.shiftKey) return; // laisse ouvrir en onglet
-    e.preventDefault(); openReader(shown[+a.dataset.ri],src);
+    e.preventDefault(); openReader(shown[+a.dataset.ri],src,body.closest(".widget"));
   }));
 }
 
-/* ============ ARTICLE READER (side drawer) ============ */
-function openReader(r,source){
+/* ============ ARTICLE READER (in-board tile) ============ */
+function closeReader(){ const p=$("#reader-tile"); if(p) p.remove(); }
+function openReader(r,source,feedEl){
+  closeReader();
   if(!r) return;
-  let d=$("#reader");
-  if(!d){ d=document.createElement("div"); d.id="reader"; document.body.appendChild(d); }
+  const board=$("#board"); if(!board) return;
+  if(feedEl && feedEl.parentElement!==board) feedEl=null;
+  const m=board.style.gridTemplateColumns.match(/repeat\((\d+)/); const COLS=m?+m[1]:3;
+  let span=COLS>1?COLS-1:1, rows=13;
+  if(feedEl){
+    const fs=(feedEl.style.gridColumn.match(/span (\d+)/)||[])[1]; const f=fs?+fs:1;
+    span=Math.max(1,COLS-f);
+    const fr=(feedEl.style.gridRow.match(/span (\d+)/)||[])[1]; if(fr) rows=Math.max(10,+fr);
+  }
   let dstr="";
   if(r.date){ const dt=new Date(r.date); if(!isNaN(dt)) dstr=dt.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+dt.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); }
-  d.innerHTML=`
-    <div class="reader-head">
-      <span class="reader-src">${esc(source||"")}${r.cat?` · ${esc(r.cat)}`:""}</span>
-      <button class="icon-btn" id="reader-x" title="Fermer" aria-label="Fermer">✕</button>
+  const panel=document.createElement("div");
+  panel.className="widget reader-tile"; panel.id="reader-tile";
+  panel.style.gridColumn="span "+span; panel.style.gridRow="span "+rows;
+  panel.innerHTML=`
+    <div class="widget-head">
+      <span class="reader-src" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(source||"")}${r.cat?` · ${esc(r.cat)}`:""}</span>
+      <button class="w-tool reader-x" title="Fermer le lecteur" aria-label="Fermer">✕</button>
     </div>
-    <div class="reader-body">
+    <div class="widget-body reader-scroll">
       <h2 class="reader-title">${esc(r.title||"")}</h2>
       ${dstr?`<div class="reader-date">${esc(dstr)}</div>`:""}
       ${r.img?`<img class="reader-img" src="${esc(r.img)}" alt="" onerror="this.remove()">`:""}
@@ -1009,8 +1019,10 @@ function openReader(r,source){
       <div class="reader-note">Aperçu issu du flux RSS. Le texte intégral s'ouvre sur le site d'origine, où ta connexion s'applique.</div>
       <a class="btn primary reader-open" href="${esc(r.link)}" target="_blank" rel="noopener">Lire l'article complet →</a>
     </div>`;
-  d.classList.add("show");
-  $("#reader-x").onclick=()=>d.classList.remove("show");
+  if(feedEl){ feedEl.after(panel); }
+  else { const ab=board.querySelector(".addbar"); if(ab) board.insertBefore(panel,ab); else board.appendChild(panel); }
+  panel.querySelector(".reader-x").onclick=closeReader;
+  panel.scrollIntoView({block:"nearest",behavior:"smooth"});
 }
 
 /* ============ DRAG & DROP (flat reorder) ============ */
@@ -1062,7 +1074,7 @@ const overlay=$("#overlay"), modal=$("#modal");
 function openModal(html){ modal.innerHTML=html; overlay.classList.add("show"); }
 function closeModal(){ overlay.classList.remove("show"); modal.innerHTML=""; }
 overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) closeModal(); });
-document.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ if(overlay.classList.contains("show")) closeModal(); const rd=$("#reader"); if(rd&&rd.classList.contains("show")) rd.classList.remove("show"); } });
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ if(overlay.classList.contains("show")) closeModal(); closeReader(); } });
 
 function openAddWidget(){
   const opts=[

@@ -710,25 +710,49 @@ function renderRss(w){
 }
 async function loadRss(w,body){
   if(!w.data.url){ body.innerHTML=`<div class="w-state">Aucun flux défini.</div><div style="text-align:center"><button class="w-cfg-btn">Ajouter un flux RSS</button></div>`; body.querySelector("button").onclick=()=>configRss(w); return; }
+  const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const keys=(w.data.filter||"").split(",").map(k=>norm(k.trim())).filter(Boolean);
   try{
-    const proxy="https://api.allorigins.win/raw?url=";
-    const r=await fetch(proxy+encodeURIComponent(w.data.url));
-    const txt=await r.text();
-    const doc=new DOMParser().parseFromString(txt,"text/xml");
-    let items=[...doc.querySelectorAll("item")];
-    if(!items.length) items=[...doc.querySelectorAll("entry")];
-    if(!items.length) throw new Error("empty");
+    const proxies=[
+      u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
+      u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
+      u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
+    ];
+    let items=null,doc=null;
+    for(const mkurl of proxies){
+      try{
+        const r=await fetch(mkurl(w.data.url));
+        if(!r.ok) continue;
+        const txt=await r.text();
+        if(!txt||txt.length<50) continue;
+        const d=new DOMParser().parseFromString(txt,"text/xml");
+        let it=[...d.querySelectorAll("item")];
+        if(!it.length) it=[...d.querySelectorAll("entry")];
+        if(it.length){ items=it; doc=d; break; }
+      }catch(_){}
+    }
+    if(!items) throw new Error("all proxies failed");
     const src=(doc.querySelector("channel > title")||doc.querySelector("feed > title"))?.textContent||domain(w.data.url);
-    let html='<div class="rss-list">';
-    items.slice(0,8).forEach(it=>{
+    let rows=items.map(it=>{
       const title=(it.querySelector("title")?.textContent||"").trim();
       let link=it.querySelector("link")?.textContent?.trim();
       if(!link){ const l=it.querySelector("link"); link=l?.getAttribute("href")||"#"; }
-      html+=`<a class="rss-item" href="${esc(link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(title)}</div><div class="rss-src">${esc(src)}</div></a>`;
+      const desc=(it.querySelector("description")?.textContent||it.querySelector("summary")?.textContent||"").trim();
+      return {title,link,desc};
+    });
+    if(keys.length){ rows=rows.filter(it=>{ const hay=norm(it.title+" "+it.desc); return keys.some(k=>hay.includes(k)); }); }
+    if(!rows.length){
+      body.innerHTML=`<div class="w-state">Aucun titre ne correspond à tes mots-clés pour l'instant.</div><div style="text-align:center"><button class="w-cfg-btn">Modifier le filtre</button></div>`;
+      body.querySelector("button").onclick=()=>configRss(w); return;
+    }
+    let html='<div class="rss-list">';
+    rows.slice(0,10).forEach(it=>{
+      html+=`<a class="rss-item" href="${esc(it.link)}" target="_blank" rel="noopener"><div class="rss-t">${esc(it.title)}</div><div class="rss-src">${esc(src)}</div></a>`;
     });
     html+="</div>";
+    if(keys.length){ html+=`<div class="task-foot"><span class="task-count">Filtré · ${esc(w.data.filter)}</span></div>`; }
     body.innerHTML=html;
-  }catch(e){ body.innerHTML=`<div class="w-state err">Flux illisible.</div><div style="text-align:center"><button class="w-cfg-btn">Modifier</button></div>`; body.querySelector("button").onclick=()=>configRss(w); }
+  }catch(e){ body.innerHTML=`<div class="w-state err">Flux temporairement injoignable.</div><div style="text-align:center"><button class="w-cfg-btn">Réessayer</button></div>`; body.querySelector("button").onclick=()=>{ body.innerHTML=`<div class="w-state">Chargement…</div>`; loadRss(w,body); }; }
 }
 
 /* ============ DRAG & DROP ============ */
@@ -890,11 +914,12 @@ function configRss(w){
   openModal(`
     <div class="modal-head"><h3>Flux RSS</h3><button class="icon-btn" id="mx">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>URL du flux</label><input type="url" id="rx-url" value="${esc(w.data.url||"")}" placeholder="https://…/feed.xml"><div class="hint">Récupéré via un proxy public (allorigins). Modifiable dans le code si tu préfères le tien.</div></div>
+      <div class="field"><label>URL du flux</label><input type="url" id="rx-url" value="${esc(w.data.url||"")}" placeholder="https://…/feed.xml"><div class="hint">Ex. Courrier International : https://www.courrierinternational.com/feed/all/rss.xml</div></div>
+      <div class="field"><label>Filtrer par mots-clés (optionnel)</label><input type="text" id="rx-filter" value="${esc(w.data.filter||"")}" placeholder="Chine, climat, IA, économie"><div class="hint">Séparés par des virgules. La carte ne gardera que les titres contenant l'un de ces mots (accents ignorés). Laisse vide pour tout afficher.</div></div>
     </div>
     <div class="modal-foot"><button class="btn ghost" id="rx-cancel">Annuler</button><button class="btn primary" id="rx-save">Enregistrer</button></div>`);
   $("#mx").onclick=closeModal; $("#rx-cancel").onclick=closeModal;
-  $("#rx-save").onclick=()=>{ w.data.url=$("#rx-url").value.trim(); save(); renderBoard(); closeModal(); };
+  $("#rx-save").onclick=()=>{ w.data.url=$("#rx-url").value.trim(); w.data.filter=$("#rx-filter").value.trim(); save(); renderBoard(); closeModal(); };
 }
 
 /* ============ PAGES ============ */

@@ -6,7 +6,7 @@
    - Polices Google : cache-first en arrière-plan (l'app reste lisible sans elles).
    Pour publier une nouvelle version : incrémenter CACHE_VERSION ci-dessous. */
 
-const CACHE_VERSION = "permis-c-v6";
+const CACHE_VERSION = "permis-c-v7";
 const CORE = [
   "./",
   "./index.html",
@@ -15,7 +15,18 @@ const CORE = [
   "./icon-512.png",
   "./icon-maskable-512.png",
   "./apple-touch-icon.png",
-  "./oral-1.mp3"
+  "./oral-1.mp3",
+  "./oral-2.mp3",
+  "./oral-3.mp3",
+  "./oral-4.mp3",
+  "./oral-5.mp3",
+  "./oral-6.mp3",
+  "./oral-7.mp3",
+  "./oral-8.mp3",
+  "./oral-9.mp3",
+  "./oral-10.mp3",
+  "./oral-11.mp3",
+  "./oral-12.mp3"
 ];
 
 self.addEventListener("install", event => {

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
+<meta name="startdeck-build" content="2026-09-21.1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -197,6 +198,15 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
   .grid{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.savebar{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0;color:var(--tx2);font-size:13px}
+.savebar button{padding:8px 12px;border:1px solid var(--line);border-radius:9px;color:var(--accent)}
+.savebar [data-error=true]{color:var(--down)}
+.card:focus-within .cact,.lnk:focus-within .x,.task:focus-within .x{opacity:1}
+.card,.hud,.clockbox{min-width:0}
+.ctitle{overflow-wrap:anywhere;min-width:0}
+.notice{line-height:1.6;font-size:14px;color:var(--tx2);margin:12px 0}
+@media(hover:none){.cact,.lnk .x,.task .x{opacity:1}.iconbtn{width:36px;height:36px}.in{font-size:16px}}
+@media(max-width:380px){.hud{gap:8px;flex-wrap:wrap}.weather{padding:10px;gap:8px}.clock{font-size:26px}.engine>button{padding:8px 4px}}
 </style>
 </head>
 <body>
@@ -204,7 +214,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <header class="top">
   <h1 class="hello" id="hello">Bonjour</h1>
   <div class="hud">
-    <div class="weather" id="wnow" hidden><div class="ico" id="wico">☁️</div><div><div class="t" id="wtemp">—</div><div class="c" id="wcity">—</div></div></div>
+    <div class="weather" id="wnow" hidden><div class="ico" id="wico">â˜ï¸</div><div><div class="t" id="wtemp">â€”</div><div class="c" id="wcity">â€”</div></div></div>
     <div class="clockbox"><div class="clock" id="clock">--:--</div><div class="date" id="date"></div></div>
     <button class="gear" id="btnSettings" title="Réglages" aria-label="Réglages">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -215,7 +225,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <div class="searchwrap">
   <div class="search">
     <div class="engine">
-      <button id="btnEngine" aria-haspopup="true"><span id="engineName">Google</span> <span style="font-size:9px">▼</span></button>
+      <button id="btnEngine" aria-haspopup="true"><span id="engineName">Google</span> <span style="font-size:9px">â–¼</span></button>
     </div>
     <input id="q" placeholder="Rechercher sur le web ou dans vos favoris..." autocomplete="off" spellcheck="false">
     <button class="go" id="btnGo" aria-label="Rechercher">
@@ -227,7 +237,46 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <nav class="tabs" id="tabs"></nav>
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
-<footer>StartDeck · votre page de démarrage, hébergée par vous. Données stockées localement dans ce navigateur.</footer>
+<div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
+<footer>StartDeck · <span id="buildLabel">2026-09-21.1</span> · Vos données restent sur cet appareil tant que la synchronisation nâ€™est pas activée.</footer>
+
+<script id="startdeck-core">
+function safeUrl(value){
+  try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:''}catch{return ''}
+}
+function validateState(value){
+  const d=JSON.parse(JSON.stringify(value));
+  const fail=()=>{throw new Error('Données StartDeck invalides. Aucun remplacement effectué.')};
+  if(!d||!d.settings||typeof d.settings!=='object'||!Array.isArray(d.tabs)||!d.tabs.length)fail();
+  const text=v=>typeof v==='string';
+  const ids=new Set();
+  for(const t of d.tabs){
+    if(!t||!text(t.id)||!text(t.name)||!Array.isArray(t.cards)||ids.has(t.id))fail();ids.add(t.id);
+    for(const c of t.cards){
+      if(!c||!text(c.id)||!text(c.title)||ids.has(c.id)||!['notes','links','tasks','weather','markets','rss'].includes(c.type))fail();ids.add(c.id);
+      if(c.type==='notes'&&!text(c.text??''))fail();
+      if(['links','tasks'].includes(c.type)){
+        if(!Array.isArray(c.items))fail();
+        for(const i of c.items){if(!i||!text(i.t))fail();if(c.type==='links'&&!safeUrl(i.u))fail();}
+      }
+      if(c.city!==undefined&&!text(c.city))fail();
+      if(c.coins!==undefined&&(!Array.isArray(c.coins)||!c.coins.every(text)))fail();
+      if(c.url&&!safeUrl(c.url))fail();
+    }
+  }
+  for(const k of ['name','city','accent','bg','engine'])if(d.settings[k]!==undefined&&!text(d.settings[k]))fail();
+  if(d.settings.bg&&!safeUrl(d.settings.bg))fail();
+  d.settings={name:'',city:'Paris',accent:'#f5c24c',bg:'',engine:'google',...d.settings};
+  if(!['google','ddg','bing','perplexity','youtube','github','tv'].includes(d.settings.engine))d.settings.engine='google';
+  d.active=Number.isInteger(d.active)?Math.max(0,Math.min(d.active,d.tabs.length-1)):0;
+  return d;
+}
+function syncDecision(local,revision){
+  if(revision===0)return 'push';
+  if(local.dirty)return local.base===revision?'push':'conflict';
+  return local.base===revision?'idle':'pull';
+}
+</script>
 
 <script>
 const KEY='startdeck.v1';
@@ -260,7 +309,7 @@ function seed(){
           {t:'Investing.com Agenda',u:'https://fr.investing.com/economic-calendar/'},
           {t:'ForexFactory',u:'https://www.forexfactory.com/calendar'},
           {t:'Finviz',u:'https://finviz.com/futures.ashx'}]},
-        {id:uid(),type:'notes',title:'Plan de trading',text:"Biais avant tout.\nA = confluence totale (full size)\nB = 1 signal manquant (half)\nC = structure seule (quarter)\n\nEntrée : pullback VWAP / bord de range + 2-3 imbalances empilées + absorption + delta flip.\nStop 1-2 ticks au-delà de l'absorption, jamais élargi.\nPartiel à +1R, trail après +1.5R, runner vers PDH/PDL ou LVN.\n\nNo-trade : chop dans la VA de la veille, VWAP entremêlés, news ±2 min.\nMax 3 stops → pause 30 min. Après +2R, taille -50%."},
+        {id:uid(),type:'notes',title:'Plan de trading',text:"Biais avant tout.\nA = confluence totale (full size)\nB = 1 signal manquant (half)\nC = structure seule (quarter)\n\nEntrée : pullback VWAP / bord de range + 2-3 imbalances empilées + absorption + delta flip.\nStop 1-2 ticks au-delà de l'absorption, jamais élargi.\nPartiel à +1R, trail après +1.5R, runner vers PDH/PDL ou LVN.\n\nNo-trade : chop dans la VA de la veille, VWAP entremêlés, news ±2 min.\nMax 3 stops â†’ pause 30 min. Après +2R, taille -50%."},
         {id:uid(),type:'markets',title:'Marchés',coins:['bitcoin','ethereum','solana']}
       ]},
       {id:uid(),name:'Web',cards:[
@@ -296,10 +345,41 @@ function seed(){
   };
 }
 
-let S;
-try{S=JSON.parse(localStorage.getItem(KEY))||seed()}catch(e){S=seed()}
-if(!S.tabs||!S.tabs.length)S=seed();
-const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const STORE_KEY='startdeck.v2',BACKUP_KEY='startdeck.backup.v2';
+let S,store,lastStored='',storageFailed=false,syncTimer;
+function setSaveStatus(message,error=false){const el=document.getElementById('saveStatus');el.textContent=message;el.dataset.error=error}
+try{
+  lastStored=localStorage.getItem(STORE_KEY)||'';
+  const legacy=localStorage.getItem(KEY);
+  store=lastStored?JSON.parse(lastStored):{data:legacy?JSON.parse(legacy):seed(),base:null,dirty:!!legacy,owner:null};
+  S=validateState(store.data);store.data=S;
+}catch(e){
+  storageFailed=true;
+  S=seed();store={data:S,base:null,dirty:false,owner:null};
+  setSaveStatus('Sauvegarde illisible ou inaccessible â€” exportez vos données avant de continuer.',true);
+}
+function backup(data=S){localStorage.setItem(BACKUP_KEY,JSON.stringify({at:new Date().toISOString(),data}))}
+function persist(){
+  if(storageFailed)return false;
+  try{
+    if((localStorage.getItem(STORE_KEY)||'')!==lastStored){
+      download(S,'startdeck-copie-concurrente');
+      storageFailed=true;setSaveStatus('Un autre onglet a changé les données. Copie exportée : rechargez cette page.',true);return false;
+    }
+    store.data=S;const next=JSON.stringify(store);localStorage.setItem(STORE_KEY,next);lastStored=next;return true;
+  }catch(e){storageFailed=true;setSaveStatus('Sauvegarde impossible (stockage plein ou bloqué). Exportez vos données.',true);return false}
+}
+function save(){
+  store.dirty=true;
+  if(persist()){
+    setSaveStatus(navigator.onLine?'Enregistré sur cet appareil':'Hors connexion · enregistré sur cet appareil');
+    clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),1000);
+  }
+}
+function download(data,name='startdeck'){
+  const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.href=url;a.download=name+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 const tab=()=>S.tabs[Math.min(S.active,S.tabs.length-1)];
 const card=id=>tab().cards.find(c=>c.id===id);
 
@@ -323,7 +403,7 @@ function applyTheme(){
 }
 
 /* ---------- weather ---------- */
-const WICON={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',66:'🌧️',67:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',77:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️'};
+const WICON={0:'â˜€ï¸',1:'🌤ï¸',2:'â›…',3:'â˜ï¸',45:'🌫ï¸',48:'🌫ï¸',51:'🌦ï¸',53:'🌦ï¸',55:'🌦ï¸',61:'🌧ï¸',63:'🌧ï¸',65:'🌧ï¸',66:'🌧ï¸',67:'🌧ï¸',71:'🌨ï¸',73:'🌨ï¸',75:'â„ï¸',77:'â„ï¸',80:'🌦ï¸',81:'🌧ï¸',82:'â›ˆï¸',85:'🌨ï¸',86:'â„ï¸',95:'â›ˆï¸',96:'â›ˆï¸',99:'â›ˆï¸'};
 const wcache={};
 async function weather(city){
   city=city||'Paris';
@@ -339,7 +419,7 @@ async function weather(city){
 async function headerWeather(){
   try{
     const d=await weather(S.settings.city);
-    wico.textContent=WICON[d.code]||'☁️';
+    wico.textContent=WICON[d.code]||'â˜ï¸';
     wtemp.textContent=d.cur+'°';
     wcity.textContent=d.name;
     wnow.hidden=false;
@@ -375,7 +455,7 @@ function shell(c,extra){
   const el=document.createElement('section');
   el.className='card';el.dataset.id=c.id;
   el.innerHTML=`<div class="chead">
-    <span class="grip" title="Glisser pour déplacer">⠿</span>
+    <span class="grip" title="Glisser pour déplacer">â ¿</span>
     <div class="ctitle" data-t>${esc(c.title)}</div>
     <div class="cact">${extra||''}<button class="iconbtn danger" data-del title="Supprimer la carte">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></div>
@@ -420,8 +500,7 @@ function renderLinks(c,body){
 function renderNotes(c,body){
   const t=document.createElement('textarea');
   t.className='notes';t.placeholder='Écrivez ici...';t.value=c.text||'';
-  let h;
-  t.oninput=()=>{clearTimeout(h);h=setTimeout(()=>{c.text=t.value;save()},400)};
+  t.oninput=()=>{c.text=t.value;save()};
   t.onblur=()=>{c.text=t.value;save()};
   body.appendChild(t);
   const grow=()=>{t.style.height='auto';t.style.height=Math.max(150,t.scrollHeight+4)+'px'};
@@ -434,7 +513,7 @@ function renderTasks(c,body){
   c.items.forEach((it,i)=>{
     const r=document.createElement('div');
     r.className='task'+(it.d?' done':'');
-    r.innerHTML=`<button class="box">${it.d?'✓':''}</button><div class="txt">${esc(it.t)}</div><button class="x iconbtn" title="Retirer">×</button>`;
+    r.innerHTML=`<button class="box">${it.d?'âœ“':''}</button><div class="txt">${esc(it.t)}</div><button class="x iconbtn" title="Retirer">×</button>`;
     r.querySelector('.box').onclick=()=>{it.d=!it.d;save();render()};
     r.querySelector('.x').onclick=()=>{c.items.splice(i,1);save();render()};
     const tx=r.querySelector('.txt');
@@ -454,33 +533,33 @@ function renderTasks(c,body){
 }
 
 async function renderWeather(c,body){
-  body.innerHTML='<div class="muted">Chargement…</div>';
+  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
   try{
     const d=await weather(c.city||S.settings.city);
     const days=d.daily.time.slice(1,5).map((t,i)=>{
       const n=new Date(t).toLocaleDateString('fr-FR',{weekday:'short'});
-      return `<div class="wday">${esc(n)}<span class="e">${WICON[d.daily.weather_code[i+1]]||'☁️'}</span><span class="m">${Math.round(d.daily.temperature_2m_max[i+1])}° / ${Math.round(d.daily.temperature_2m_min[i+1])}°</span></div>`;
+      return `<div class="wday">${esc(n)}<span class="e">${WICON[d.daily.weather_code[i+1]]||'â˜ï¸'}</span><span class="m">${Math.round(d.daily.temperature_2m_max[i+1])}° / ${Math.round(d.daily.temperature_2m_min[i+1])}°</span></div>`;
     }).join('');
-    body.innerHTML=`<div class="wbig"><div class="i">${WICON[d.code]||'☁️'}</div><div><div class="d">${d.cur}°</div><div class="muted" style="padding:0">${esc(d.name)}</div></div></div><div class="wdays">${days}</div>`;
-  }catch(e){body.innerHTML='<div class="muted">Météo indisponible. Vérifiez la ville dans les réglages de la carte (icône ⚙ au survol).</div>'}
+    body.innerHTML=`<div class="wbig"><div class="i">${WICON[d.code]||'â˜ï¸'}</div><div><div class="d">${d.cur}°</div><div class="muted" style="padding:0">${esc(d.name)}</div></div></div><div class="wdays">${days}</div>`;
+  }catch(e){body.innerHTML='<div class="muted">Météo indisponible. Vérifiez la ville dans les réglages de la carte (icône âš™ au survol).</div>'}
 }
 
 async function renderMarkets(c,body){
-  body.innerHTML='<div class="muted">Chargement…</div>';
+  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
   const ids=(c.coins&&c.coins.length?c.coins:['bitcoin','ethereum','solana']);
   try{
     const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids.join(',')+'&vs_currencies=eur&include_24hr_change=true').then(x=>x.json());
     body.innerHTML=ids.map(id=>{
       const d=r[id];if(!d)return'';
       const ch=d.eur_24h_change||0;
-      return `<div class="row"><span class="n">${esc(id.toUpperCase())}</span><span class="p">${d.eur.toLocaleString('fr-FR',{maximumFractionDigits:d.eur<10?4:2})} €</span><span class="d ${ch>=0?'up':'down'}">${ch>=0?'+':''}${ch.toFixed(2)}%</span></div>`;
+      return `<div class="row"><span class="n">${esc(id.toUpperCase())}</span><span class="p">${d.eur.toLocaleString('fr-FR',{maximumFractionDigits:d.eur<10?4:2})} â‚¬</span><span class="d ${ch>=0?'up':'down'}">${ch>=0?'+':''}${ch.toFixed(2)}%</span></div>`;
     }).join('')||'<div class="muted">Aucune donnée.</div>';
   }catch(e){body.innerHTML='<div class="muted">Cours indisponibles (limite de l\'API atteinte). Réessayez dans une minute.</div>'}
 }
 
 async function renderRss(c,body){
-  body.innerHTML='<div class="muted">Chargement…</div>';
-  if(!c.url){body.innerHTML='<div class="muted">Aucun flux configuré. Survolez la carte et cliquez sur ⚙ pour ajouter une URL RSS.</div>';return}
+  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
+  if(!c.url){body.innerHTML='<div class="muted">Aucun flux configuré. Survolez la carte et cliquez sur âš™ pour ajouter une URL RSS.</div>';return}
   try{
     const txt=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(c.url)).then(r=>r.text());
     const doc=new DOMParser().parseFromString(txt,'text/xml');
@@ -490,7 +569,7 @@ async function renderRss(c,body){
       const t=it.querySelector('title')?.textContent||'';
       const l=it.querySelector('link')?.getAttribute('href')||it.querySelector('link')?.textContent||'#';
       const d=it.querySelector('pubDate,updated')?.textContent||'';
-      return `<a class="feed" href="${esc(l)}" rel="noreferrer"><b>${esc(t)}</b><i>${d?esc(new Date(d).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</i></a>`;
+      return `<a class="feed" href="${esc(safeUrl(l)||'#')}" rel="noreferrer"><b>${esc(t)}</b><i>${d?esc(new Date(d).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</i></a>`;
     }).join('');
   }catch(e){body.innerHTML='<div class="muted">Flux illisible. Vérifiez l\'URL du RSS.</div>'}
 }
@@ -550,6 +629,7 @@ function linkModal(c){
   const ok=()=>{
     let u=lu.value.trim();if(!u)return;
     if(!/^https?:\/\//i.test(u))u='https://'+u;
+    if(!safeUrl(u)){alert('Adresse web invalide.');return}
     c.items=c.items||[];
     c.items.push({t:lt.value.trim()||host(u).replace(/^www\./,''),u});
     save();o.remove();render();
@@ -560,8 +640,8 @@ function linkModal(c){
 }
 
 const TYPES=[
-  ['links','🔖','Favoris'],['notes','📝','Notes'],['tasks','✅','Tâches'],
-  ['weather','🌤️','Météo'],['markets','💰','Marchés'],['rss','📰','Actualités RSS']
+  ['links','🔖','Favoris'],['notes','📝','Notes'],['tasks','âœ…','Tâches'],
+  ['weather','🌤ï¸','Météo'],['markets','💰','Marchés'],['rss','📰','Actualités RSS']
 ];
 btnAddCard.onclick=()=>{
   const o=modal('Ajouter une carte','<div class="types">'+TYPES.map(t=>`<button class="type" data-t="${t[0]}"><span class="e">${t[1]}</span>${t[2]}</button>`).join('')+'</div>');
@@ -586,12 +666,13 @@ btnSettings.onclick=()=>{
     <label class="f"><span>Moteur de recherche par défaut</span><select class="in" id="se">${Object.entries(ENGINES).map(([k,v])=>`<option value="${k}"${k===s.engine?' selected':''}>${v[0]}</option>`).join('')}</select></label>
     <label class="f"><span>Couleur d'accent</span></label>
     <div class="swatches">${cols.map(c=>`<button class="sw" data-col="${c}" style="background:${c}" aria-pressed="${c===s.accent}"></button>`).join('')}</div>
-    <label class="f" style="margin-top:20px"><span>Image d'arrière-plan (URL, vide pour le fond sombre)</span><input class="in" id="sb" value="${esc(s.bg||'')}" placeholder="https://…"></label>
+    <label class="f" style="margin-top:20px"><span>Image d'arrière-plan (URL, vide pour le fond sombre)</span><input class="in" id="sb" value="${esc(s.bg||'')}" placeholder="https://â€¦"></label>
     <div class="sep"></div>
     <div class="btns" style="justify-content:flex-start">
       <button class="btn" id="exp">Exporter (JSON)</button>
       <button class="btn" id="imp">Importer un JSON</button>
       <button class="btn" id="impb">Importer mes favoris</button>
+      <button class="btn" id="restore">Restaurer la sauvegarde précédente</button>
     </div>
     <p class="hint">L'import de favoris accepte le fichier <b>.html</b> exporté depuis Chrome, Firefox, Edge ou Safari. Chaque dossier devient une carte dans l'onglet courant.</p>
     <div class="sep"></div>
@@ -603,17 +684,19 @@ btnSettings.onclick=()=>{
     s.city=o.querySelector('#sc').value.trim()||'Paris';
     s.engine=o.querySelector('#se').value;
     s.bg=o.querySelector('#sb').value.trim();
+    if(s.bg&&!safeUrl(s.bg)){alert('Utilisez une URL http ou https pour le fond.');return}
     s.accent=acc;
     save();applyTheme();engineName.textContent=ENGINES[s.engine][0];headerWeather();o.remove();render();
   };
   o.querySelector('#exp').onclick=()=>{
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
-    a.download='startdeck-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+    download(S);
+  };
+  o.querySelector('#restore').onclick=()=>{
+    try{const b=JSON.parse(localStorage.getItem(BACKUP_KEY));if(!b)throw Error('Aucune sauvegarde précédente.');const d=validateState(b.data);if(!confirm('Restaurer la sauvegarde du '+new Date(b.at).toLocaleString('fr-FR')+' ?'))return;backup();S=d;save();refreshView();o.remove()}catch(e){alert(e.message)}
   };
   o.querySelector('#imp').onclick=()=>pick('.json',f=>{
     const r=new FileReader();
-    r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.tabs)throw 0;S=d;save();applyTheme();o.remove();render();headerWeather()}catch(e){alert('Fichier illisible : ce JSON ne vient pas de StartDeck.')}};
+    r.onload=()=>{try{const d=validateState(JSON.parse(r.result));backup();S=d;save();refreshView();o.remove()}catch(e){alert('Import refusé : '+e.message)}};
     r.readAsText(f);
   });
   o.querySelector('#impb').onclick=()=>pick('.html,.htm',f=>{
@@ -636,7 +719,7 @@ btnSettings.onclick=()=>{
     };
     r.readAsText(f);
   });
-  o.querySelector('#reset').onclick=()=>{if(confirm('Effacer tous vos onglets, cartes et réglages ?')){localStorage.removeItem(KEY);location.reload()}};
+  o.querySelector('#reset').onclick=()=>{if(confirm('Réinitialiser les onglets, cartes et réglages ? Si la synchronisation est active, ce changement sera partagé avec vos autres appareils. Une sauvegarde locale sera conservée.')){try{backup();S=seed();save();refreshView();o.remove()}catch(e){alert('Sauvegarde impossible : réinitialisation annulée.')}}};
 };
 function pick(accept,cb){
   const i=document.createElement('input');
@@ -701,11 +784,182 @@ document.addEventListener('keydown',e=>{
   if(e.key==='/'||(e.key==='k'&&(e.metaKey||e.ctrlKey))){e.preventDefault();q.focus()}
 });
 
+/* ---------- synchronisation privée : configuration facultative ---------- */
+// Seules l'URL du projet et sa clé PUBLIQUE peuvent être intégrées ici.
+const DEFAULT_CLOUD={url:'',key:''};
+const CLOUD_KEY='startdeck.cloud.v1',SESSION_KEY='startdeck.session.v1';
+let cloud=DEFAULT_CLOUD,session=null,syncBusy=false,remoteConflict=null;
+try{cloud=JSON.parse(localStorage.getItem(CLOUD_KEY))||DEFAULT_CLOUD;session=JSON.parse(localStorage.getItem(SESSION_KEY))}catch{}
+function editing(){return !!document.querySelector('.overlay')||document.activeElement?.matches('input,textarea,[contenteditable="true"]')}
+function refreshView(){applyTheme();engineName.textContent=ENGINES[S.settings.engine][0];render();headerWeather()}
+function validateCloud(url,key){
+  const u=new URL(url);
+  if(u.protocol!=='https:'||!/^[-a-z0-9]+\.supabase\.co$/.test(u.hostname)||u.pathname!=='/'||u.search||u.hash||u.username||u.password)throw Error('Utilisez lâ€™URL https://votre-projet.supabase.co');
+  let allowed=key.startsWith('sb_publishable_');
+  if(!allowed){try{allowed=JSON.parse(atob(key.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role==='anon'}catch{}}
+  if(!allowed)throw Error('Utilisez uniquement une clé publique publishable ou anon, jamais une clé secrète.');
+  return {url:u.origin,key};
+}
+async function cloudRequest(path,{method='GET',body,auth=true,config=cloud}={}){
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    const headers={apikey:config.key,'Content-Type':'application/json'};
+    if(auth){if(!session?.access_token)throw Error('Connectez-vous pour synchroniser.');headers.Authorization='Bearer '+session.access_token}
+    const r=await fetch(config.url+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:controller.signal});
+    const d=await r.json().catch(()=>null);
+    if(!r.ok){const e=new Error(r.status===401?'Session expirée : reconnectez-vous.':r.status===409?'Conflit : une autre version vient dâ€™être enregistrée.':r.status>=500?'Service indisponible. Les données restent sur cet appareil.':(d?.msg||d?.message||d?.error_description||'Configuration ou connexion à vérifier.'));e.status=r.status;throw e}
+    return d;
+  }finally{clearTimeout(timeout)}
+}
+async function ensureSession(){
+  // La session peut avoir été renouvelée dans un autre onglet.
+  session=JSON.parse(localStorage.getItem(SESSION_KEY));
+  if(!session?.user?.id)throw Error('Connectez-vous pour synchroniser.');
+  if(session.expires_at*1000<Date.now()+60000){
+    session=await cloudRequest('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:session.refresh_token},auth:false});
+    localStorage.setItem(SESSION_KEY,JSON.stringify(session));
+  }
+}
+async function syncNow(){
+  if(syncBusy||storageFailed||!cloud.url||!session||document.hidden)return;
+  if(!navigator.onLine){setSaveStatus('Hors connexion · synchronisation en attente');return}
+  const run=async()=>{
+    syncBusy=true;
+    try{
+      await ensureSession();
+      const owner=cloud.url+'/'+session.user.id;
+      if(store.owner&&store.owner!==owner)throw Error('Ces données appartiennent à un autre compte. Utilisez un profil de navigateur distinct.');
+      const rows=await cloudRequest('/rest/v1/startdeck_state?select=data,revision,updated_at&user_id=eq.'+encodeURIComponent(session.user.id));
+      if(!Array.isArray(rows))throw Error('Réponse du stockage invalide.');
+      const remote=rows[0],revision=remote?.revision||0;
+      if(remote)remote.data=validateState(remote.data);
+      const choice=syncDecision(store,revision);
+      if(choice==='conflict'){
+        remoteConflict=remote;setSaveStatus('Deux versions modifiées · choisissez dans Synchronisation',true);return;
+      }
+      if(choice==='pull'){
+        if(editing()){setSaveStatus('Nouvelle version de vos données en attente de la fin de saisie');return}
+        backup();S=remote.data;store={data:S,base:revision,dirty:false,owner};
+        if(!persist())return;refreshView();
+      }else if(choice==='push'){
+        if(remoteConflict)return;
+        const sent=JSON.stringify(validateState(S));
+        const result=await cloudRequest('/rest/v1/rpc/startdeck_save',{method:'POST',body:{expected_revision:store.base??0,new_data:JSON.parse(sent)}});
+        if(!Number.isSafeInteger(result?.revision))throw Error('Réponse de sauvegarde invalide.');
+        store.base=result.revision;store.owner=owner;store.dirty=JSON.stringify(S)!==sent;
+        if(!persist())return;
+      }
+      remoteConflict=null;
+      setSaveStatus(store.dirty?'Modifications suivantes en attente':'Synchronisé · '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+      if(store.dirty){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),1000)}
+    }catch(e){setSaveStatus(e.name==='AbortError'?'Connexion trop lente · données conservées sur cet appareil':e.message,true)}
+    finally{syncBusy=false}
+  };
+  if(navigator.locks)await navigator.locks.request('startdeck-sync',{ifAvailable:true},async lock=>{if(lock)await run()});
+  else await run();
+}
+document.getElementById('btnSync').onclick=()=>{
+  const o=modal('Synchronisation entre appareils',`
+    <p class="notice">${session?'Connecté : '+esc(session.user?.email||'votre compte'):'Vos données sont actuellement enregistrées sur cet appareil. Connectez chaque appareil au même compte pour les partager.'}</p>
+    <p class="notice">Un projet Supabase doit être configuré une seule fois. <a href="./SYNC-SETUP.md" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Instructions dâ€™activation</a>. Ne saisissez jamais une clé secrète.</p>
+    <label class="f"><span>URL du projet Supabase</span><input class="in" id="cloudUrl" type="url" value="${esc(cloud.url||'')}" placeholder="https://votre-projet.supabase.co"></label>
+    <label class="f"><span>Clé publique (publishable ou anon)</span><input class="in" id="cloudKey" value="${esc(cloud.key||'')}" autocomplete="off"></label>
+    <label class="f"><span>Adresse e-mail du compte</span><input class="in" id="cloudEmail" type="email" autocomplete="username" value="${esc(session?.user?.email||'')}"></label>
+    <label class="f"><span>Mot de passe du compte</span><input class="in" id="cloudPassword" type="password" autocomplete="current-password"></label>
+    <p class="notice" id="cloudMessage" role="status"></p>
+    <div class="btns"><button class="btn" id="cloudExport">Exporter mes données</button><button class="btn pri" id="cloudLogin">Se connecter</button>${session?'<button class="btn" id="cloudNow">Synchroniser maintenant</button><button class="btn" id="cloudLogout">Déconnecter cet appareil</button>':''}</div>
+    ${remoteConflict?'<div class="sep"></div><p class="notice">Deux appareils ont été modifiés. Exportez les deux versions avant de choisir : elles ne seront pas fusionnées automatiquement.</p><div class="btns"><button class="btn" id="exportRemote">Exporter la version en ligne</button><button class="btn" id="keepLocal">Garder cet appareil</button><button class="btn" id="keepRemote">Utiliser la version en ligne</button></div>':''}`);
+  const message=o.querySelector('#cloudMessage');
+  o.querySelector('#cloudExport').onclick=()=>download(S);
+  o.querySelector('#cloudLogin').onclick=async()=>{
+    const button=o.querySelector('#cloudLogin');button.disabled=true;
+    try{
+      if(syncBusy)throw Error('Une synchronisation est en cours. Réessayez dans quelques secondes.');
+      const config=validateCloud(o.querySelector('#cloudUrl').value.trim(),o.querySelector('#cloudKey').value.trim());
+      const email=o.querySelector('#cloudEmail').value.trim(),password=o.querySelector('#cloudPassword').value;
+      if(!email||!password)throw Error('Renseignez votre e-mail et votre mot de passe.');
+      const signed=await cloudRequest('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password},auth:false,config});
+      if(store.owner&&store.owner!==config.url+'/'+signed.user.id)throw Error('Cette copie est liée à un autre compte. Utilisez un autre profil de navigateur.');
+      cloud=config;
+      localStorage.setItem(CLOUD_KEY,JSON.stringify(cloud));localStorage.setItem(SESSION_KEY,JSON.stringify(signed));session=signed;
+      o.querySelector('#cloudPassword').value='';o.remove();await syncNow();
+    }catch(e){message.textContent=e.message}finally{button.disabled=false}
+  };
+  if(session){
+    o.querySelector('#cloudNow').onclick=()=>{o.remove();syncNow()};
+    o.querySelector('#cloudLogout').onclick=()=>{
+      if(syncBusy){message.textContent='Attendez la fin de la synchronisation.';return}
+      localStorage.removeItem(SESSION_KEY);session=null;remoteConflict=null;setSaveStatus('Déconnecté · données conservées sur cet appareil');o.remove();
+    };
+  }
+  if(remoteConflict){
+    const remote=remoteConflict;
+    o.querySelector('#exportRemote').onclick=()=>download(remote.data,'startdeck-version-en-ligne');
+    o.querySelector('#keepLocal').onclick=()=>{
+      if(syncBusy)return;
+      if(!confirm('Remplacer la version en ligne par celle de cet appareil ? La version en ligne sera conservée en sauvegarde locale.'))return;
+      try{backup(remote.data);store.base=remote.revision;store.dirty=true;remoteConflict=null;if(persist()){o.remove();syncNow()}}catch(e){message.textContent=e.message}
+    };
+    o.querySelector('#keepRemote').onclick=()=>{
+      if(syncBusy)return;
+      if(!confirm('Remplacer les données de cet appareil par la version en ligne ? Une sauvegarde de cet appareil sera conservée.'))return;
+      try{backup();S=remote.data;store.base=remote.revision;store.dirty=false;store.owner=cloud.url+'/'+session.user.id;remoteConflict=null;if(persist()){o.remove();refreshView();syncNow()}}catch(e){message.textContent=e.message}
+    };
+  }
+};
+window.addEventListener('storage',e=>{
+  if(e.key===SESSION_KEY){try{session=e.newValue?JSON.parse(e.newValue):null}catch{}return}
+  if(e.key!==STORE_KEY||!e.newValue||storageFailed)return;
+  if(editing()){setSaveStatus('Un autre onglet a changé les données : terminez puis rechargez.',true);return}
+  try{const next=JSON.parse(e.newValue);S=validateState(next.data);store=next;lastStored=e.newValue;refreshView();setSaveStatus('Mis à jour depuis un autre onglet')}catch{}
+});
+window.addEventListener('online',()=>syncNow());
+window.addEventListener('offline',()=>setSaveStatus('Hors connexion · sauvegarde locale'));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
+setInterval(()=>syncNow(),15000);
+
+/* ---------- versions du site et mode hors connexion ---------- */
+const updateButton=document.getElementById('btnUpdate');
+const pageSignature=doc=>[...doc.querySelectorAll('script:not([src]),style')].map(el=>el.textContent).join('\n');
+const loadedSignature=pageSignature(document);
+let updateFound=false,checkingUpdate=false,lastInput=Date.now(),registration;
+document.addEventListener('input',()=>{lastInput=Date.now()});
+function applyUpdate(){if(storageFailed)return;document.activeElement?.blur();location.reload()}
+updateButton.onclick=applyUpdate;
+async function checkUpdate(){
+  if(checkingUpdate||document.hidden||!navigator.onLine||!/^https?:$/.test(location.protocol))return;
+  checkingUpdate=true;const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+  try{
+    if(registration)registration.update().catch(()=>{});
+    const url=new URL('./index.html',location.href);url.searchParams.set('_sd_check',Date.now());
+    const res=await fetch(url,{cache:'no-store',signal:controller.signal});
+    if(!res.ok||!res.headers.get('content-type')?.includes('text/html'))return;
+    const doc=new DOMParser().parseFromString(await res.text(),'text/html');
+    if(!doc.querySelector('meta[name="startdeck-build"]'))return;
+    updateFound=pageSignature(doc)!==loadedSignature;
+    updateButton.hidden=!updateFound;
+    if(updateFound&&!editing()&&!q.value&&Date.now()-lastInput>15000)applyUpdate();
+  }catch{}finally{clearTimeout(timeout);checkingUpdate=false}
+}
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+  navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(r=>{registration=r}).catch(()=>{});
+}
+window.addEventListener('pageshow',()=>checkUpdate());
+window.addEventListener('online',()=>checkUpdate());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+setInterval(checkUpdate,60000);
+
 /* ---------- go ---------- */
 applyTheme();
 render();
 tick();
 headerWeather();
+if(!storageFailed){
+  try{if(!localStorage.getItem(BACKUP_KEY)&&localStorage.getItem(KEY))backup()}catch{}
+  persist();
+  setSaveStatus(session?'Connexion à la synchronisationâ€¦':'Enregistré sur cet appareil · synchronisation non activée');
+  syncNow();
+}
 </script>
 </body>
 </html>

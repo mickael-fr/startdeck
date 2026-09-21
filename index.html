@@ -214,7 +214,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <header class="top">
   <h1 class="hello" id="hello">Bonjour</h1>
   <div class="hud">
-    <div class="weather" id="wnow" hidden><div class="ico" id="wico">â˜ï¸</div><div><div class="t" id="wtemp">â€”</div><div class="c" id="wcity">â€”</div></div></div>
+    <div class="weather" id="wnow" hidden><div class="ico" id="wico">☁️</div><div><div class="t" id="wtemp">—</div><div class="c" id="wcity">—</div></div></div>
     <div class="clockbox"><div class="clock" id="clock">--:--</div><div class="date" id="date"></div></div>
     <button class="gear" id="btnSettings" title="Réglages" aria-label="Réglages">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -225,7 +225,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <div class="searchwrap">
   <div class="search">
     <div class="engine">
-      <button id="btnEngine" aria-haspopup="true"><span id="engineName">Google</span> <span style="font-size:9px">â–¼</span></button>
+      <button id="btnEngine" aria-haspopup="true"><span id="engineName">Google</span> <span style="font-size:9px">▼</span></button>
     </div>
     <input id="q" placeholder="Rechercher sur le web ou dans vos favoris..." autocomplete="off" spellcheck="false">
     <button class="go" id="btnGo" aria-label="Rechercher">
@@ -238,7 +238,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-21.1</span> · Vos données restent sur cet appareil tant que la synchronisation nâ€™est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-21.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -309,7 +309,7 @@ function seed(){
           {t:'Investing.com Agenda',u:'https://fr.investing.com/economic-calendar/'},
           {t:'ForexFactory',u:'https://www.forexfactory.com/calendar'},
           {t:'Finviz',u:'https://finviz.com/futures.ashx'}]},
-        {id:uid(),type:'notes',title:'Plan de trading',text:"Biais avant tout.\nA = confluence totale (full size)\nB = 1 signal manquant (half)\nC = structure seule (quarter)\n\nEntrée : pullback VWAP / bord de range + 2-3 imbalances empilées + absorption + delta flip.\nStop 1-2 ticks au-delà de l'absorption, jamais élargi.\nPartiel à +1R, trail après +1.5R, runner vers PDH/PDL ou LVN.\n\nNo-trade : chop dans la VA de la veille, VWAP entremêlés, news ±2 min.\nMax 3 stops â†’ pause 30 min. Après +2R, taille -50%."},
+        {id:uid(),type:'notes',title:'Plan de trading',text:"Biais avant tout.\nA = confluence totale (full size)\nB = 1 signal manquant (half)\nC = structure seule (quarter)\n\nEntrée : pullback VWAP / bord de range + 2-3 imbalances empilées + absorption + delta flip.\nStop 1-2 ticks au-delà de l'absorption, jamais élargi.\nPartiel à +1R, trail après +1.5R, runner vers PDH/PDL ou LVN.\n\nNo-trade : chop dans la VA de la veille, VWAP entremêlés, news ±2 min.\nMax 3 stops → pause 30 min. Après +2R, taille -50%."},
         {id:uid(),type:'markets',title:'Marchés',coins:['bitcoin','ethereum','solana']}
       ]},
       {id:uid(),name:'Web',cards:[
@@ -356,7 +356,7 @@ try{
 }catch(e){
   storageFailed=true;
   S=seed();store={data:S,base:null,dirty:false,owner:null};
-  setSaveStatus('Sauvegarde illisible ou inaccessible â€” exportez vos données avant de continuer.',true);
+  setSaveStatus('Sauvegarde illisible ou inaccessible — exportez vos données avant de continuer.',true);
 }
 function backup(data=S){localStorage.setItem(BACKUP_KEY,JSON.stringify({at:new Date().toISOString(),data}))}
 function persist(){
@@ -403,7 +403,7 @@ function applyTheme(){
 }
 
 /* ---------- weather ---------- */
-const WICON={0:'â˜€ï¸',1:'🌤ï¸',2:'â›…',3:'â˜ï¸',45:'🌫ï¸',48:'🌫ï¸',51:'🌦ï¸',53:'🌦ï¸',55:'🌦ï¸',61:'🌧ï¸',63:'🌧ï¸',65:'🌧ï¸',66:'🌧ï¸',67:'🌧ï¸',71:'🌨ï¸',73:'🌨ï¸',75:'â„ï¸',77:'â„ï¸',80:'🌦ï¸',81:'🌧ï¸',82:'â›ˆï¸',85:'🌨ï¸',86:'â„ï¸',95:'â›ˆï¸',96:'â›ˆï¸',99:'â›ˆï¸'};
+const WICON={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',66:'🌧️',67:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',77:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️'};
 const wcache={};
 async function weather(city){
   city=city||'Paris';
@@ -419,7 +419,7 @@ async function weather(city){
 async function headerWeather(){
   try{
     const d=await weather(S.settings.city);
-    wico.textContent=WICON[d.code]||'â˜ï¸';
+    wico.textContent=WICON[d.code]||'☁️';
     wtemp.textContent=d.cur+'°';
     wcity.textContent=d.name;
     wnow.hidden=false;
@@ -455,7 +455,7 @@ function shell(c,extra){
   const el=document.createElement('section');
   el.className='card';el.dataset.id=c.id;
   el.innerHTML=`<div class="chead">
-    <span class="grip" title="Glisser pour déplacer">â ¿</span>
+    <span class="grip" title="Glisser pour déplacer">⠿</span>
     <div class="ctitle" data-t>${esc(c.title)}</div>
     <div class="cact">${extra||''}<button class="iconbtn danger" data-del title="Supprimer la carte">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></div>
@@ -513,7 +513,7 @@ function renderTasks(c,body){
   c.items.forEach((it,i)=>{
     const r=document.createElement('div');
     r.className='task'+(it.d?' done':'');
-    r.innerHTML=`<button class="box">${it.d?'âœ“':''}</button><div class="txt">${esc(it.t)}</div><button class="x iconbtn" title="Retirer">×</button>`;
+    r.innerHTML=`<button class="box">${it.d?'✓':''}</button><div class="txt">${esc(it.t)}</div><button class="x iconbtn" title="Retirer">×</button>`;
     r.querySelector('.box').onclick=()=>{it.d=!it.d;save();render()};
     r.querySelector('.x').onclick=()=>{c.items.splice(i,1);save();render()};
     const tx=r.querySelector('.txt');
@@ -533,33 +533,33 @@ function renderTasks(c,body){
 }
 
 async function renderWeather(c,body){
-  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
+  body.innerHTML='<div class="muted">Chargement…</div>';
   try{
     const d=await weather(c.city||S.settings.city);
     const days=d.daily.time.slice(1,5).map((t,i)=>{
       const n=new Date(t).toLocaleDateString('fr-FR',{weekday:'short'});
-      return `<div class="wday">${esc(n)}<span class="e">${WICON[d.daily.weather_code[i+1]]||'â˜ï¸'}</span><span class="m">${Math.round(d.daily.temperature_2m_max[i+1])}° / ${Math.round(d.daily.temperature_2m_min[i+1])}°</span></div>`;
+      return `<div class="wday">${esc(n)}<span class="e">${WICON[d.daily.weather_code[i+1]]||'☁️'}</span><span class="m">${Math.round(d.daily.temperature_2m_max[i+1])}° / ${Math.round(d.daily.temperature_2m_min[i+1])}°</span></div>`;
     }).join('');
-    body.innerHTML=`<div class="wbig"><div class="i">${WICON[d.code]||'â˜ï¸'}</div><div><div class="d">${d.cur}°</div><div class="muted" style="padding:0">${esc(d.name)}</div></div></div><div class="wdays">${days}</div>`;
-  }catch(e){body.innerHTML='<div class="muted">Météo indisponible. Vérifiez la ville dans les réglages de la carte (icône âš™ au survol).</div>'}
+    body.innerHTML=`<div class="wbig"><div class="i">${WICON[d.code]||'☁️'}</div><div><div class="d">${d.cur}°</div><div class="muted" style="padding:0">${esc(d.name)}</div></div></div><div class="wdays">${days}</div>`;
+  }catch(e){body.innerHTML='<div class="muted">Météo indisponible. Vérifiez la ville dans les réglages de la carte (icône ⚙ au survol).</div>'}
 }
 
 async function renderMarkets(c,body){
-  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
+  body.innerHTML='<div class="muted">Chargement…</div>';
   const ids=(c.coins&&c.coins.length?c.coins:['bitcoin','ethereum','solana']);
   try{
     const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids.join(',')+'&vs_currencies=eur&include_24hr_change=true').then(x=>x.json());
     body.innerHTML=ids.map(id=>{
       const d=r[id];if(!d)return'';
       const ch=d.eur_24h_change||0;
-      return `<div class="row"><span class="n">${esc(id.toUpperCase())}</span><span class="p">${d.eur.toLocaleString('fr-FR',{maximumFractionDigits:d.eur<10?4:2})} â‚¬</span><span class="d ${ch>=0?'up':'down'}">${ch>=0?'+':''}${ch.toFixed(2)}%</span></div>`;
+      return `<div class="row"><span class="n">${esc(id.toUpperCase())}</span><span class="p">${d.eur.toLocaleString('fr-FR',{maximumFractionDigits:d.eur<10?4:2})} €</span><span class="d ${ch>=0?'up':'down'}">${ch>=0?'+':''}${ch.toFixed(2)}%</span></div>`;
     }).join('')||'<div class="muted">Aucune donnée.</div>';
   }catch(e){body.innerHTML='<div class="muted">Cours indisponibles (limite de l\'API atteinte). Réessayez dans une minute.</div>'}
 }
 
 async function renderRss(c,body){
-  body.innerHTML='<div class="muted">Chargementâ€¦</div>';
-  if(!c.url){body.innerHTML='<div class="muted">Aucun flux configuré. Survolez la carte et cliquez sur âš™ pour ajouter une URL RSS.</div>';return}
+  body.innerHTML='<div class="muted">Chargement…</div>';
+  if(!c.url){body.innerHTML='<div class="muted">Aucun flux configuré. Survolez la carte et cliquez sur ⚙ pour ajouter une URL RSS.</div>';return}
   try{
     const txt=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(c.url)).then(r=>r.text());
     const doc=new DOMParser().parseFromString(txt,'text/xml');
@@ -640,8 +640,8 @@ function linkModal(c){
 }
 
 const TYPES=[
-  ['links','🔖','Favoris'],['notes','📝','Notes'],['tasks','âœ…','Tâches'],
-  ['weather','🌤ï¸','Météo'],['markets','💰','Marchés'],['rss','📰','Actualités RSS']
+  ['links','🔖','Favoris'],['notes','📝','Notes'],['tasks','✅','Tâches'],
+  ['weather','🌤️','Météo'],['markets','💰','Marchés'],['rss','📰','Actualités RSS']
 ];
 btnAddCard.onclick=()=>{
   const o=modal('Ajouter une carte','<div class="types">'+TYPES.map(t=>`<button class="type" data-t="${t[0]}"><span class="e">${t[1]}</span>${t[2]}</button>`).join('')+'</div>');
@@ -666,7 +666,7 @@ btnSettings.onclick=()=>{
     <label class="f"><span>Moteur de recherche par défaut</span><select class="in" id="se">${Object.entries(ENGINES).map(([k,v])=>`<option value="${k}"${k===s.engine?' selected':''}>${v[0]}</option>`).join('')}</select></label>
     <label class="f"><span>Couleur d'accent</span></label>
     <div class="swatches">${cols.map(c=>`<button class="sw" data-col="${c}" style="background:${c}" aria-pressed="${c===s.accent}"></button>`).join('')}</div>
-    <label class="f" style="margin-top:20px"><span>Image d'arrière-plan (URL, vide pour le fond sombre)</span><input class="in" id="sb" value="${esc(s.bg||'')}" placeholder="https://â€¦"></label>
+    <label class="f" style="margin-top:20px"><span>Image d'arrière-plan (URL, vide pour le fond sombre)</span><input class="in" id="sb" value="${esc(s.bg||'')}" placeholder="https://…"></label>
     <div class="sep"></div>
     <div class="btns" style="justify-content:flex-start">
       <button class="btn" id="exp">Exporter (JSON)</button>
@@ -794,7 +794,7 @@ function editing(){return !!document.querySelector('.overlay')||document.activeE
 function refreshView(){applyTheme();engineName.textContent=ENGINES[S.settings.engine][0];render();headerWeather()}
 function validateCloud(url,key){
   const u=new URL(url);
-  if(u.protocol!=='https:'||!/^[-a-z0-9]+\.supabase\.co$/.test(u.hostname)||u.pathname!=='/'||u.search||u.hash||u.username||u.password)throw Error('Utilisez lâ€™URL https://votre-projet.supabase.co');
+  if(u.protocol!=='https:'||!/^[-a-z0-9]+\.supabase\.co$/.test(u.hostname)||u.pathname!=='/'||u.search||u.hash||u.username||u.password)throw Error('Utilisez l’URL https://votre-projet.supabase.co');
   let allowed=key.startsWith('sb_publishable_');
   if(!allowed){try{allowed=JSON.parse(atob(key.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role==='anon'}catch{}}
   if(!allowed)throw Error('Utilisez uniquement une clé publique publishable ou anon, jamais une clé secrète.');
@@ -807,7 +807,7 @@ async function cloudRequest(path,{method='GET',body,auth=true,config=cloud}={}){
     if(auth){if(!session?.access_token)throw Error('Connectez-vous pour synchroniser.');headers.Authorization='Bearer '+session.access_token}
     const r=await fetch(config.url+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:controller.signal});
     const d=await r.json().catch(()=>null);
-    if(!r.ok){const e=new Error(r.status===401?'Session expirée : reconnectez-vous.':r.status===409?'Conflit : une autre version vient dâ€™être enregistrée.':r.status>=500?'Service indisponible. Les données restent sur cet appareil.':(d?.msg||d?.message||d?.error_description||'Configuration ou connexion à vérifier.'));e.status=r.status;throw e}
+    if(!r.ok){const e=new Error(r.status===401?'Session expirée : reconnectez-vous.':r.status===409?'Conflit : une autre version vient d’être enregistrée.':r.status>=500?'Service indisponible. Les données restent sur cet appareil.':(d?.msg||d?.message||d?.error_description||'Configuration ou connexion à vérifier.'));e.status=r.status;throw e}
     return d;
   }finally{clearTimeout(timeout)}
 }
@@ -861,7 +861,7 @@ async function syncNow(){
 document.getElementById('btnSync').onclick=()=>{
   const o=modal('Synchronisation entre appareils',`
     <p class="notice">${session?'Connecté : '+esc(session.user?.email||'votre compte'):'Vos données sont actuellement enregistrées sur cet appareil. Connectez chaque appareil au même compte pour les partager.'}</p>
-    <p class="notice">Un projet Supabase doit être configuré une seule fois. <a href="./SYNC-SETUP.md" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Instructions dâ€™activation</a>. Ne saisissez jamais une clé secrète.</p>
+    <p class="notice">Un projet Supabase doit être configuré une seule fois. <a href="./SYNC-SETUP.md" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Instructions d’activation</a>. Ne saisissez jamais une clé secrète.</p>
     <label class="f"><span>URL du projet Supabase</span><input class="in" id="cloudUrl" type="url" value="${esc(cloud.url||'')}" placeholder="https://votre-projet.supabase.co"></label>
     <label class="f"><span>Clé publique (publishable ou anon)</span><input class="in" id="cloudKey" value="${esc(cloud.key||'')}" autocomplete="off"></label>
     <label class="f"><span>Adresse e-mail du compte</span><input class="in" id="cloudEmail" type="email" autocomplete="username" value="${esc(session?.user?.email||'')}"></label>
@@ -957,7 +957,7 @@ headerWeather();
 if(!storageFailed){
   try{if(!localStorage.getItem(BACKUP_KEY)&&localStorage.getItem(KEY))backup()}catch{}
   persist();
-  setSaveStatus(session?'Connexion à la synchronisationâ€¦':'Enregistré sur cet appareil · synchronisation non activée');
+  setSaveStatus(session?'Connexion à la synchronisation…':'Enregistré sur cet appareil · synchronisation non activée');
   syncNow();
 }
 </script>

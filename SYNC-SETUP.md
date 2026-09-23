@@ -29,7 +29,7 @@ L'URL et la clé publique peuvent être renseignées une fois dans `DEFAULT_CLOU
 
 `sw.js` appartient désormais à StartDeck. Il ne met en cache que sa page pour le mode hors connexion, jamais les API privées. Il faut visiter le site en ligne au moins une fois pour préparer cette copie.
 
-La page vérifie ses scripts et styles au démarrage, au retour au premier plan et chaque minute. Une mise à jour s'applique lorsque vous ne saisissez rien ; un bouton permet aussi de l'appliquer. Les changements HTML statiques seuls sont récupérés à la prochaine ouverture/recharge. Une nouvelle version de script ou de style ne demande pas d'incrémenter un numéro de cache.
+La page vérifie ses scripts et styles au démarrage, au retour au premier plan et chaque minute. Une mise à jour est proposée par un bouton : elle ne recharge jamais automatiquement une session de travail. Les changements HTML statiques seuls sont récupérés à la prochaine ouverture/recharge. Une nouvelle version de script ou de style ne demande pas d'incrémenter un numéro de cache.
 
 La mise en ligne GitHub Pages peut prendre quelques minutes. Un appareil sans réseau conserve nécessairement la dernière version reçue. Les applications et onglets suspendus se resynchronisent à leur réouverture.
 

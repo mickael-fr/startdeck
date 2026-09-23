@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-21.1">
+<meta name="startdeck-build" content="2026-09-23.1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -207,6 +207,33 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 .notice{line-height:1.6;font-size:14px;color:var(--tx2);margin:12px 0}
 @media(hover:none){.cact,.lnk .x,.task .x{opacity:1}.iconbtn{width:36px;height:36px}.in{font-size:16px}}
 @media(max-width:380px){.hud{gap:8px;flex-wrap:wrap}.weather{padding:10px;gap:8px}.clock{font-size:26px}.engine>button{padding:8px 4px}}
+.grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+.card{grid-column:span 4}
+.card[data-type="notes"]{grid-column:span 8}
+.card[data-wide="true"]{grid-column:1/-1}
+.card[data-compact="true"]{grid-column:span 4}
+.cact,.task .x,.lnk .x{opacity:1}
+.chead{flex-wrap:wrap;gap:6px}.cact{margin-left:auto}
+.tab-group{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tab-group .tab{border:0;margin:0}
+.tab-options{min-width:36px;min-height:42px;color:var(--tx2);font-size:22px;border-left:1px solid var(--line)}
+.tab-options:hover{color:var(--accent)}
+.note-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.note-toolbar button,.task-actions button{min-width:34px;min-height:34px;border:1px solid var(--line);border-radius:7px;color:var(--tx2)}
+.note-toolbar button:hover,.task-actions button:hover{background:var(--card2);color:var(--accent)}
+.note-toolbar .editor-hint{font-size:12px;color:var(--tx3);margin-left:6px}
+.notes{display:block;height:clamp(280px,48vh,580px);min-height:220px;max-height:80vh;overflow:auto;resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;line-height:1.7;scrollbar-gutter:stable}
+.notes:focus{border-color:var(--accent)}
+.notes:empty::before{content:attr(data-placeholder);color:var(--tx3);pointer-events:none}
+.notes ul,.notes ol{padding-left:24px}.notes p{margin-bottom:.6em}
+.task .txt{overflow-wrap:anywhere;min-width:0;white-space:pre-wrap;text-align:left}
+.task-actions{display:flex;gap:4px;flex-wrap:wrap;flex:none}
+.task.done .txt{text-decoration:none}.task.done .txt>*{text-decoration:line-through}
+.task-editor{height:160px;min-height:120px}
+button:disabled{opacity:.35;cursor:default}
+.card[data-type="markets"] .cbody,.card[data-type="weather"] .cbody,.card[data-type="rss"] .cbody{min-height:240px}
+@media(max-width:1050px){.card,.card[data-compact="true"]{grid-column:span 6}.card[data-type="notes"],.card[data-wide="true"]{grid-column:1/-1}}
+@media(max-width:700px){.card,.card[data-compact="true"]{grid-column:1/-1}.notes{height:360px;max-height:none;font-size:16px}.task{flex-wrap:wrap}.task .txt{flex-basis:calc(100% - 40px)}.task-actions{margin-left:32px}.tab{padding:10px 12px}}
 </style>
 </head>
 <body>
@@ -238,7 +265,7 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-21.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-23.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -255,9 +282,10 @@ function validateState(value){
     for(const c of t.cards){
       if(!c||!text(c.id)||!text(c.title)||ids.has(c.id)||!['notes','links','tasks','weather','markets','rss'].includes(c.type))fail();ids.add(c.id);
       if(c.type==='notes'&&!text(c.text??''))fail();
+      if(c.html!==undefined&&!text(c.html))fail();
       if(['links','tasks'].includes(c.type)){
         if(!Array.isArray(c.items))fail();
-        for(const i of c.items){if(!i||!text(i.t))fail();if(c.type==='links'&&!safeUrl(i.u))fail();}
+        for(const i of c.items){if(!i||!text(i.t))fail();if(i.html!==undefined&&!text(i.html))fail();if(c.type==='links'&&!safeUrl(i.u))fail();}
       }
       if(c.city!==undefined&&!text(c.city))fail();
       if(c.coins!==undefined&&(!Array.isArray(c.coins)||!c.coins.every(text)))fail();
@@ -427,47 +455,58 @@ async function headerWeather(){
 }
 
 /* ---------- tabs ---------- */
+function preserveScroll(action){
+  const x=window.scrollX,y=window.scrollY;action();window.scrollTo(x,y);
+}
+function protectedChange(action){
+  try{backup();action();return true}catch(e){alert('Sauvegarde impossible : modification annulée.');return false}
+}
 function renderTabs(){
   tabs.innerHTML='';
   S.tabs.forEach((t,i)=>{
-    const b=document.createElement('button');
-    b.className='tab'+(i===S.active?' on':'');
-    b.textContent=t.name;
-    b.title='Double-clic pour renommer';
-    b.onclick=()=>{S.active=i;save();render()};
-    b.ondblclick=()=>{
-      const n=prompt('Nom de l\'onglet',t.name);
-      if(n===null)return;
-      if(!n.trim()){if(S.tabs.length>1&&confirm('Supprimer l\'onglet « '+t.name+' » ?')){S.tabs.splice(i,1);S.active=0}}
-      else t.name=n.trim();
-      save();render();
-    };
-    tabs.appendChild(b);
+    const group=document.createElement('div');group.className='tab-group';
+    const b=document.createElement('button');b.className='tab'+(i===S.active?' on':'');b.textContent=t.name;
+    b.setAttribute('aria-current',i===S.active?'page':'false');
+    b.onclick=()=>{if(S.active===i)return;S.active=i;save();render()};
+    const options=document.createElement('button');options.className='tab-options';options.textContent='⋯';options.dataset.tabOptions=t.id;
+    options.title='Options de l’onglet '+t.name;options.setAttribute('aria-label',options.title);options.onclick=()=>tabOptions(t);
+    group.append(b,options);tabs.appendChild(group);
   });
-  const a=document.createElement('button');
-  a.className='tab-add';a.textContent='+';a.title='Nouvel onglet';
-  a.onclick=()=>{const n=prompt('Nom du nouvel onglet','Nouveau');if(!n)return;S.tabs.push({id:uid(),name:n,cards:[]});S.active=S.tabs.length-1;save();render()};
-  tabs.appendChild(a);
+  const a=document.createElement('button');a.className='tab-add';a.textContent='+';a.title='Nouvel onglet';a.setAttribute('aria-label',a.title);
+  a.onclick=()=>{const n=prompt('Nom du nouvel onglet','Nouveau');if(!n?.trim())return;S.tabs.push({id:uid(),name:n.trim(),cards:[]});S.active=S.tabs.length-1;save();render()};tabs.appendChild(a);
+}
+function tabOptions(t){
+  const index=S.tabs.indexOf(t);
+  const o=modal('Gérer l’onglet',`<label class="f"><span>Nom de l’onglet</span><input class="in" id="tabName" value="${esc(t.name)}"></label>
+    <div class="btns"><button class="btn pri" id="renameTab">Renommer</button><button class="btn" id="tabLeft" ${index===0?'disabled':''}>← Déplacer à gauche</button><button class="btn" id="tabRight" ${index===S.tabs.length-1?'disabled':''}>Déplacer à droite →</button></div>
+    <div class="sep"></div><button class="btn" id="deleteTab" ${S.tabs.length===1?'disabled':''}>Supprimer cet onglet et ses cartes</button><p class="hint">Une sauvegarde est conservée avant suppression. Le dernier onglet ne peut pas être supprimé.</p>`);
+  o.querySelector('#renameTab').onclick=()=>{const name=o.querySelector('#tabName').value.trim();if(!name)return;t.name=name;save();o.remove();renderTabs()};
+  const move=delta=>{const active=tab().id;S.tabs.splice(index+delta,0,S.tabs.splice(index,1)[0]);S.active=S.tabs.findIndex(x=>x.id===active);save();o.remove();renderTabs()};
+  o.querySelector('#tabLeft').onclick=()=>move(-1);o.querySelector('#tabRight').onclick=()=>move(1);
+  o.querySelector('#deleteTab').onclick=()=>{
+    if(S.tabs.length===1||!confirm('Supprimer « '+t.name+' » et ses '+t.cards.length+' carte(s) ?'))return;
+    protectedChange(()=>{const active=tab().id;S.tabs.splice(index,1);S.active=Math.max(0,S.tabs.findIndex(x=>x.id===active));save();o.remove();preserveScroll(()=>render())});
+  };
 }
 
 /* ---------- cards ---------- */
 function shell(c,extra){
   const el=document.createElement('section');
-  el.className='card';el.dataset.id=c.id;
+  el.className='card';el.dataset.id=c.id;el.dataset.type=c.type;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');
   el.innerHTML=`<div class="chead">
     <span class="grip" title="Glisser pour déplacer">⠿</span>
     <div class="ctitle" data-t>${esc(c.title)}</div>
-    <div class="cact">${extra||''}<button class="iconbtn danger" data-del title="Supprimer la carte">
+    <div class="cact">${extra||''}<button class="iconbtn" data-options title="Renommer ou déplacer la carte" aria-label="Options de la carte ${esc(c.title)}">⋯</button><button class="iconbtn danger" data-del title="Supprimer la carte">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></div>
   </div><div class="cbody"></div>`;
   const t=el.querySelector('[data-t]');
   t.onclick=()=>{t.contentEditable='true';t.focus();document.execCommand&&document.getSelection().selectAllChildren(t)};
   t.onblur=()=>{t.contentEditable='false';c.title=t.textContent.trim()||'Sans titre';t.textContent=c.title;save()};
   t.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();t.blur()}};
-  el.querySelector('[data-del]').onclick=()=>{if(!confirm('Supprimer « '+c.title+' » ?'))return;tab().cards=tab().cards.filter(x=>x.id!==c.id);save();render()};
+  el.querySelector('[data-options]').onclick=()=>cardOptions(c,el);
+  el.querySelector('[data-del]').onclick=()=>{if(!confirm('Supprimer « '+c.title+' » ?'))return;protectedChange(()=>{tab().cards=tab().cards.filter(x=>x.id!==c.id);save();preserveScroll(()=>render())})};
   const g=el.querySelector('.grip');
   g.onmousedown=()=>el.draggable=true;
-  g.ontouchstart=()=>el.draggable=true;
   el.addEventListener('dragstart',e=>{drag=c.id;el.classList.add('drag');e.dataTransfer.effectAllowed='move'});
   el.addEventListener('dragend',()=>{el.draggable=false;el.classList.remove('drag');document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'))});
   el.addEventListener('dragover',e=>{e.preventDefault();if(drag&&drag!==c.id)el.classList.add('over')});
@@ -476,11 +515,24 @@ function shell(c,extra){
     e.preventDefault();el.classList.remove('over');
     const cs=tab().cards,from=cs.findIndex(x=>x.id===drag),to=cs.findIndex(x=>x.id===c.id);
     if(from<0||to<0||from===to)return;
-    cs.splice(to,0,cs.splice(from,1)[0]);save();render();
+    cs.splice(to,0,cs.splice(from,1)[0]);save();preserveScroll(()=>render());
   });
   return el;
 }
 let drag=null;
+
+function cardOptions(c,el){
+  const source=tab(),index=source.cards.indexOf(c);
+  const o=modal('Gérer la carte',`<label class="f"><span>Titre de la carte</span><input class="in" id="cardName" value="${esc(c.title)}"></label>
+    <div class="btns"><button class="btn pri" id="renameCard">Renommer</button><button class="btn" id="cardUp" ${index===0?'disabled':''}>↑ Monter</button><button class="btn" id="cardDown" ${index===source.cards.length-1?'disabled':''}>↓ Descendre</button></div>
+    <label class="f"><span>Déplacer vers l’onglet</span><select class="in" id="cardDestination">${S.tabs.map(t=>`<option value="${esc(t.id)}" ${t.id===source.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label><button class="btn" id="moveCard">Déplacer la carte</button>
+    ${c.type==='notes'?`<div class="sep"></div><label class="f"><span>Largeur de la note sur ordinateur</span><select class="in" id="noteWidth"><option value="auto" ${!c.width||c.width==='auto'?'selected':''}>Large (par défaut)</option><option value="full" ${c.width==='full'?'selected':''}>Toute la largeur</option><option value="compact" ${c.width==='compact'?'selected':''}>Compacte</option></select></label><button class="btn" id="applyWidth">Appliquer la largeur</button>`:''}`);
+  o.querySelector('#renameCard').onclick=()=>{const name=o.querySelector('#cardName').value.trim();if(!name)return;c.title=name;el.querySelector('[data-t]').textContent=name;save();o.remove()};
+  const move=delta=>{source.cards.splice(index+delta,0,source.cards.splice(index,1)[0]);save();o.remove();preserveScroll(()=>render())};
+  o.querySelector('#cardUp').onclick=()=>move(-1);o.querySelector('#cardDown').onclick=()=>move(1);
+  o.querySelector('#moveCard').onclick=()=>{const dest=S.tabs.find(t=>t.id===o.querySelector('#cardDestination').value);if(!dest||dest===source)return;source.cards.splice(index,1);dest.cards.push(c);save();o.remove();preserveScroll(()=>render())};
+  if(c.type==='notes')o.querySelector('#applyWidth').onclick=()=>{c.width=o.querySelector('#noteWidth').value;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');save();o.remove()};
+}
 
 function renderLinks(c,body){
   c.items=c.items||[];
@@ -497,39 +549,81 @@ function renderLinks(c,body){
   body.appendChild(b);
 }
 
-function renderNotes(c,body){
-  const t=document.createElement('textarea');
-  t.className='notes';t.placeholder='Écrivez ici...';t.value=c.text||'';
-  t.oninput=()=>{c.text=t.value;save()};
-  t.onblur=()=>{c.text=t.value;save()};
-  body.appendChild(t);
-  const grow=()=>{t.style.height='auto';t.style.height=Math.max(150,t.scrollHeight+4)+'px'};
-  t.addEventListener('input',grow);
-  requestAnimationFrame(grow);
+/* Le HTML des notes reste limité à la mise en forme, sans liens ni attributs actifs. */
+function sanitizeRich(html){
+  const doc=new DOMParser().parseFromString(String(html),'text/html');
+  const allowed=new Set(['B','STRONG','I','EM','U','S','STRIKE','BR','DIV','P','UL','OL','LI']);
+  const clean=node=>{
+    if(node.nodeType===3)return document.createTextNode(node.nodeValue);
+    const fragment=document.createDocumentFragment();
+    if(node.nodeType!==1||['SCRIPT','STYLE','IFRAME','OBJECT','SVG','MATH','IMG'].includes(node.tagName))return fragment;
+    let out=allowed.has(node.tagName)?document.createElement(node.tagName.toLowerCase()):fragment;
+    // Les navigateurs représentent parfois le soulignement et le barré par des spans.
+    if(node.tagName==='SPAN'){
+      const marks=[];if(node.style.fontWeight==='bold'||Number(node.style.fontWeight)>=600)marks.push('b');
+      if(node.style.textDecoration.includes('underline')||node.style.textDecorationLine.includes('underline'))marks.push('u');
+      if(node.style.textDecoration.includes('line-through')||node.style.textDecorationLine.includes('line-through'))marks.push('s');
+      for(const mark of marks){const el=document.createElement(mark);out.appendChild(el);out=el}
+    }
+    for(const child of node.childNodes)out.appendChild(clean(child));
+    return fragment.childNodes.length?fragment:out;
+  };
+  const holder=document.createElement('div');for(const node of doc.body.childNodes)holder.appendChild(clean(node));return holder.innerHTML;
 }
-
-function renderTasks(c,body){
-  c.items=c.items||[];
-  c.items.forEach((it,i)=>{
-    const r=document.createElement('div');
-    r.className='task'+(it.d?' done':'');
-    r.innerHTML=`<button class="box">${it.d?'✓':''}</button><div class="txt">${esc(it.t)}</div><button class="x iconbtn" title="Retirer">×</button>`;
-    r.querySelector('.box').onclick=()=>{it.d=!it.d;save();render()};
-    r.querySelector('.x').onclick=()=>{c.items.splice(i,1);save();render()};
-    const tx=r.querySelector('.txt');
-    tx.onclick=()=>{tx.contentEditable='true';tx.focus()};
-    tx.onblur=()=>{tx.contentEditable='false';const v=tx.textContent.trim();if(v)it.t=v;else c.items.splice(i,1);save();render()};
-    tx.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();tx.blur()}};
-    body.appendChild(r);
+function editorText(el){return typeof el.innerText==='string'?el.innerText:el.textContent}
+function richEditor(container,{text='',html,save:commit,label='Note',className=''}){
+  const toolbar=document.createElement('div');toolbar.className='note-toolbar';toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label','Mise en forme');
+  const editor=document.createElement('div');editor.className='notes '+className;editor.setAttribute('contenteditable','true');editor.setAttribute('role','textbox');editor.setAttribute('aria-multiline','true');editor.setAttribute('aria-label',label);editor.dataset.placeholder='Écrivez ici…';editor.spellcheck=true;
+  if(typeof html==='string')editor.innerHTML=sanitizeRich(html);else editor.textContent=text;
+  let composing=false,selection;
+  const remember=()=>{const sel=window.getSelection();if(sel?.rangeCount&&editor.contains(sel.anchorNode)&&editor.contains(sel.focusNode))selection=sel.getRangeAt(0).cloneRange()};
+  const changed=()=>{if(!composing&&commit)commit(editorText(editor),sanitizeRich(editor.innerHTML))};
+  editor.addEventListener('compositionstart',()=>composing=true);editor.addEventListener('compositionend',()=>{composing=false;changed()});
+  editor.addEventListener('input',changed);editor.addEventListener('keyup',remember);editor.addEventListener('mouseup',remember);editor.addEventListener('touchend',remember);
+  const format=command=>{
+    const pageY=window.scrollY,top=editor.scrollTop;editor.focus({preventScroll:true});
+    if(selection){try{const sel=window.getSelection();sel.removeAllRanges();sel.addRange(selection)}catch{}}
+    if(document.execCommand)document.execCommand(command,false,null);
+    remember();changed();editor.scrollTop=top;window.scrollTo(window.scrollX,pageY);
+  };
+  for(const [command,name,markup] of [['bold','Gras','<b>G</b>'],['underline','Souligner','<u>S</u>'],['strikeThrough','Barrer','<s>B</s>'],['removeFormat','Retirer la mise en forme','Tx']]){
+    const button=document.createElement('button');button.type='button';button.dataset.command=command;button.title=name;button.setAttribute('aria-label',name);button.innerHTML=markup;
+    button.onpointerdown=e=>{remember();e.preventDefault()};button.onclick=()=>format(command);toolbar.appendChild(button);
+  }
+  const hint=document.createElement('span');hint.className='editor-hint';hint.textContent='Sélectionnez du texte, puis choisissez sa mise en forme.';toolbar.appendChild(hint);
+  editor.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['b','u'].includes(e.key.toLowerCase())){e.preventDefault();remember();format(e.key.toLowerCase()==='b'?'bold':'underline')}});
+  editor.addEventListener('paste',e=>{
+    e.preventDefault();const text=e.clipboardData?.getData('text/plain')||'';
+    if(document.execCommand)document.execCommand('insertText',false,text);changed();
   });
-  const inp=document.createElement('input');
-  inp.className='newtask';inp.placeholder='+ Nouvelle tâche... (Entrée)';
-  inp.onkeydown=e=>{if(e.key==='Enter'&&inp.value.trim()){c.items.push({t:inp.value.trim(),d:false});save();render()}};
-  body.appendChild(inp);
-  const n=c.items.filter(x=>!x.d).length;
-  const p=document.createElement('div');p.className='count';
-  p.textContent=n?n+' restante'+(n>1?'s':''):'Tout est fait 🎉';
-  body.appendChild(p);
+  editor.addEventListener('drop',e=>e.preventDefault());
+  container.append(toolbar,editor);return editor;
+}
+function renderNotes(c,body){
+  richEditor(body,{text:c.text||'',html:c.html,label:'Note : '+c.title,save:(text,html)=>{c.text=text;c.html=html;save()}});
+}
+function renderTasks(c,body){
+  c.items=c.items||[];body.innerHTML='';
+  const count=document.createElement('div');count.className='count';
+  const updateCount=()=>{const n=c.items.filter(x=>!x.d).length;count.textContent=n?n+' restante'+(n>1?'s':''):'Tout est fait 🎉'};
+  const redraw=()=>preserveScroll(()=>renderTasks(c,body));
+  c.items.forEach((it,i)=>{
+    const r=document.createElement('div');r.className='task'+(it.d?' done':'');
+    r.innerHTML=`<button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><div class="task-actions"><button data-up title="Monter la tâche" aria-label="Monter la tâche" ${i===0?'disabled':''}>↑</button><button data-down title="Descendre la tâche" aria-label="Descendre la tâche" ${i===c.items.length-1?'disabled':''}>↓</button><button data-edit title="Modifier la tâche" aria-label="Modifier la tâche">✎</button><button data-delete title="Supprimer la tâche" aria-label="Supprimer la tâche">×</button></div>`;
+    r.querySelector('.box').onclick=()=>{it.d=!it.d;save();r.classList.toggle('done',it.d);const b=r.querySelector('.box');b.textContent=it.d?'✓':'';b.setAttribute('aria-pressed',String(it.d));b.setAttribute('aria-label',it.d?'Marquer comme à faire':'Terminer la tâche');updateCount()};
+    const edit=()=>{
+      const o=modal('Modifier la tâche','<div id="taskEditor"></div><div class="btns"><button class="btn pri" id="saveTask">Enregistrer</button></div>');
+      const editor=richEditor(o.querySelector('#taskEditor'),{text:it.t,html:it.html,label:'Texte de la tâche',className:'task-editor'});editor.id='taskText';
+      o.querySelector('#saveTask').onclick=()=>{const text=editorText(editor).trim();if(!text){alert('Saisissez un texte ou utilisez le bouton Supprimer.');return}it.t=text;it.html=sanitizeRich(editor.innerHTML);save();o.remove();redraw()};
+    };
+    r.querySelector('.txt').onclick=edit;r.querySelector('[data-edit]').onclick=edit;
+    r.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(i,1);save();redraw()})};
+    const move=delta=>{c.items.splice(i+delta,0,c.items.splice(i,1)[0]);save();redraw()};
+    r.querySelector('[data-up]').onclick=()=>move(-1);r.querySelector('[data-down]').onclick=()=>move(1);body.appendChild(r);
+  });
+  const inp=document.createElement('input');inp.className='newtask';inp.placeholder='+ Nouvelle tâche... (Entrée)';inp.setAttribute('aria-label','Nouvelle tâche');
+  inp.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&inp.value.trim()){e.preventDefault();c.items.push({t:inp.value.trim(),d:false});save();redraw();body.querySelector('.newtask').focus({preventScroll:true})}};
+  body.append(inp,count);updateCount();
 }
 
 async function renderWeather(c,body){
@@ -578,6 +672,7 @@ const REFRESH='<button class="iconbtn" data-refresh title="Rafraîchir"><svg wid
 const CFG='<button class="iconbtn" data-cfg title="Configurer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.6"/><path d="M4 12h3M17 12h3M12 4v3M12 17v3"/></svg></button>';
 
 function render(){
+  const scrollX=window.scrollX,scrollY=window.scrollY;
   renderTabs();
   grid.innerHTML='';
   const cs=tab().cards;
@@ -605,6 +700,7 @@ function render(){
     grid.appendChild(el);
   });
   tick();
+  window.scrollTo(scrollX,scrollY);
 }
 
 /* ---------- modals ---------- */
@@ -673,6 +769,7 @@ btnSettings.onclick=()=>{
       <button class="btn" id="imp">Importer un JSON</button>
       <button class="btn" id="impb">Importer mes favoris</button>
       <button class="btn" id="restore">Restaurer la sauvegarde précédente</button>
+      <button class="btn" id="preUpdate">Exporter la copie avant mise à jour</button>
     </div>
     <p class="hint">L'import de favoris accepte le fichier <b>.html</b> exporté depuis Chrome, Firefox, Edge ou Safari. Chaque dossier devient une carte dans l'onglet courant.</p>
     <div class="sep"></div>
@@ -694,6 +791,7 @@ btnSettings.onclick=()=>{
   o.querySelector('#restore').onclick=()=>{
     try{const b=JSON.parse(localStorage.getItem(BACKUP_KEY));if(!b)throw Error('Aucune sauvegarde précédente.');const d=validateState(b.data);if(!confirm('Restaurer la sauvegarde du '+new Date(b.at).toLocaleString('fr-FR')+' ?'))return;backup();S=d;save();refreshView();o.remove()}catch(e){alert(e.message)}
   };
+  o.querySelector('#preUpdate').onclick=()=>{try{const saved=JSON.parse(localStorage.getItem('startdeck.before-richtext.20260923'));if(!saved)throw Error('Aucune copie antérieure sur cet appareil.');download(saved.data||saved,'startdeck-avant-mise-a-jour')}catch(e){alert(e.message)}};
   o.querySelector('#imp').onclick=()=>pick('.json',f=>{
     const r=new FileReader();
     r.onload=()=>{try{const d=validateState(JSON.parse(r.result));backup();S=d;save();refreshView();o.remove()}catch(e){alert('Import refusé : '+e.message)}};
@@ -938,7 +1036,7 @@ async function checkUpdate(){
     if(!doc.querySelector('meta[name="startdeck-build"]'))return;
     updateFound=pageSignature(doc)!==loadedSignature;
     updateButton.hidden=!updateFound;
-    if(updateFound&&!editing()&&!q.value&&Date.now()-lastInput>15000)applyUpdate();
+    // Une nouvelle version est proposée, jamais imposée pendant une session de travail.
   }catch{}finally{clearTimeout(timeout);checkingUpdate=false}
 }
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
@@ -955,6 +1053,7 @@ render();
 tick();
 headerWeather();
 if(!storageFailed){
+  try{if(!localStorage.getItem('startdeck.before-richtext.20260923')&&(lastStored||localStorage.getItem(KEY)))localStorage.setItem('startdeck.before-richtext.20260923',JSON.stringify({data:S}))}catch{setSaveStatus('Copie de sécurité impossible : exportez vos données dans Réglages.',true)}
   try{if(!localStorage.getItem(BACKUP_KEY)&&localStorage.getItem(KEY))backup()}catch{}
   persist();
   setSaveStatus(session?'Connexion à la synchronisation…':'Enregistré sur cet appareil · synchronisation non activée');

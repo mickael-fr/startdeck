@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-23.1">
+<meta name="startdeck-build" content="2026-09-27.1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,6 +234,19 @@ button:disabled{opacity:.35;cursor:default}
 .card[data-type="markets"] .cbody,.card[data-type="weather"] .cbody,.card[data-type="rss"] .cbody{min-height:240px}
 @media(max-width:1050px){.card,.card[data-compact="true"]{grid-column:span 6}.card[data-type="notes"],.card[data-wide="true"]{grid-column:1/-1}}
 @media(max-width:700px){.card,.card[data-compact="true"]{grid-column:1/-1}.notes{height:360px;max-height:none;font-size:16px}.task{flex-wrap:wrap}.task .txt{flex-basis:calc(100% - 40px)}.task-actions{margin-left:32px}.tab{padding:10px 12px}}
+
+.sort-handle{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;flex:none;min-width:32px;min-height:36px;color:var(--tx2);border:1px solid transparent;border-radius:7px;font-size:20px;line-height:1;letter-spacing:0}
+.sort-handle:hover,.sort-handle:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.sorting,.sorting *{cursor:grabbing!important;user-select:none!important}
+.sort-dragging{opacity:.4}
+.task,.tab-group,.card{position:relative}
+.sort-before::before,.sort-after::after{content:'';position:absolute;left:0;right:0;height:3px;background:var(--accent);box-shadow:0 0 8px var(--accent);z-index:10;pointer-events:none}
+.sort-before::before{top:-3px}.sort-after::after{bottom:-3px}
+.card.sort-before::before{top:0}.card.sort-after::after{bottom:0}
+.tab-group.sort-before::before,.tab-group.sort-after::after{top:0;bottom:0;width:3px;height:auto;right:auto}
+.tab-group.sort-before::before{left:-4px}.tab-group.sort-after::after{left:auto;right:-4px}
+.sort-ghost{position:fixed;z-index:10000;pointer-events:none;background:var(--card2);border:1px solid var(--accent);border-radius:9px;padding:9px 12px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 6px 24px #0008;left:-1000px;top:-1000px}
+@media(max-width:700px){.task .txt{flex-basis:calc(100% - 84px)}.task-actions{margin-left:72px}.sort-handle{min-width:38px;min-height:42px}}
 </style>
 </head>
 <body>
@@ -265,7 +278,7 @@ button:disabled{opacity:.35;cursor:default}
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-23.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-27.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -461,16 +474,90 @@ function preserveScroll(action){
 function protectedChange(action){
   try{backup();action();return true}catch(e){alert('Sauvegarde impossible : modification annulée.');return false}
 }
+// Pointer events share one sortable implementation for mouse, pen and touch.
+// Only the handle starts a gesture; data and DOM move together on release.
+let activeSort=null;
+function sortable(node,handle,item,getItems,selector){
+  handle.classList.add('sort-handle');
+  handle.title='Glisser pour déplacer · clavier : flèches, Début ou Fin';
+  handle.setAttribute('aria-label','Déplacer '+(item.title||item.name||item.t));
+  const siblings=()=>[...node.parentElement.children].filter(el=>el.matches(selector));
+  function moveTo(index){
+    const list=getItems(),from=list.indexOf(item),nodes=siblings();
+    index=Math.max(0,Math.min(list.length-1,index));
+    if(from<0||from===index||nodes.length!==list.length)return;
+    const active=tab();
+    list.splice(index,0,list.splice(from,1)[0]);
+    node.parentElement.insertBefore(node,index>from?nodes[index].nextSibling:nodes[index]);
+    S.active=S.tabs.indexOf(active);save();
+    if(!storageFailed)setSaveStatus('Ordre enregistré · position '+(index+1)+' sur '+list.length);
+  }
+  handle.addEventListener('keydown',e=>{
+    const from=getItems().indexOf(item),keys={ArrowUp:from-1,ArrowLeft:from-1,ArrowDown:from+1,ArrowRight:from+1,Home:0,End:getItems().length-1};
+    if(activeSort||!(e.key in keys))return;e.preventDefault();moveTo(keys[e.key]);handle.focus({preventScroll:true});
+  });
+  handle.addEventListener('pointerdown',e=>{
+    if(e.button!==0||e.isPrimary===false||activeSort||getItems().length<2)return;
+    e.preventDefault();handle.focus({preventScroll:true});
+    const id=e.pointerId,startX=e.clientX,startY=e.clientY;
+    let x=startX,y=startY,started=false,ghost=null,target=null,after=false,frame=0,lastFrame=0;
+    const clearTarget=()=>{target?.classList.remove('sort-before','sort-after');target=null};
+    function locate(){
+      clearTarget();
+      const hit=document.elementFromPoint(x,y)?.closest(selector);
+      if(!hit||hit===node||hit.parentElement!==node.parentElement)return;
+      target=hit;const r=hit.getBoundingClientRect(),own=node.getBoundingClientRect();
+      const horizontal=selector!=='.task'&&Math.abs(own.top-r.top)<Math.min(own.height,r.height)/2;
+      after=horizontal?x>r.left+r.width/2:y>r.top+r.height/2;
+      target.classList.add(after?'sort-after':'sort-before');
+    }
+    function tick(time){
+      if(!node.isConnected){finish(false);return}
+      const dt=Math.min(32,lastFrame?time-lastFrame:16);lastFrame=time;
+      const edge=Math.min(90,innerHeight/4);
+      const speed=y<edge?-Math.min(1,(edge-y)/edge):y>innerHeight-edge?Math.min(1,(y-innerHeight+edge)/edge):0;
+      if(speed)window.scrollBy(0,speed*dt*1.15);
+      ghost.style.left=Math.max(4,Math.min(x+14,innerWidth-190))+'px';
+      ghost.style.top=Math.max(4,Math.min(y+14,innerHeight-48))+'px';
+      locate();frame=requestAnimationFrame(tick);
+    }
+    function onMove(ev){
+      if(ev.pointerId!==id)return;x=ev.clientX;y=ev.clientY;
+      if(!started&&Math.hypot(x-startX,y-startY)>=6){
+        started=true;node.classList.add('sort-dragging');document.body.classList.add('sorting');
+        ghost=document.createElement('div');ghost.className='sort-ghost';ghost.setAttribute('aria-hidden','true');ghost.textContent=item.title||item.name||item.t;document.body.appendChild(ghost);
+        frame=requestAnimationFrame(tick);
+      }
+      if(started){ev.preventDefault();locate()}
+    }
+    function finish(commit){
+      let index=-1;
+      if(commit&&started&&target){const nodes=siblings(),from=nodes.indexOf(node);index=nodes.indexOf(target)+(after?1:0);if(index>from)index--}
+      clearTarget();cancelAnimationFrame(frame);ghost?.remove();node.classList.remove('sort-dragging');document.body.classList.remove('sorting');
+      document.removeEventListener('pointermove',onMove);document.removeEventListener('pointerup',onUp);document.removeEventListener('pointercancel',onCancel);document.removeEventListener('keydown',onKey);window.removeEventListener('blur',onCancel);handle.removeEventListener('lostpointercapture',onCancel);
+      activeSort=null;if(handle.hasPointerCapture?.(id))handle.releasePointerCapture(id);
+      if(index>=0)moveTo(index);
+    }
+    const onUp=ev=>{if(ev.pointerId===id){x=ev.clientX;y=ev.clientY;if(started)locate();finish(true)}};
+    const onCancel=()=>finish(false);
+    const onKey=ev=>{if(ev.key==='Escape'){ev.preventDefault();finish(false)}};
+    activeSort={cancel:onCancel};
+    document.addEventListener('pointermove',onMove,{passive:false});document.addEventListener('pointerup',onUp);document.addEventListener('pointercancel',onCancel);document.addEventListener('keydown',onKey);window.addEventListener('blur',onCancel);handle.addEventListener('lostpointercapture',onCancel);
+    handle.setPointerCapture?.(id);
+  });
+}
 function renderTabs(){
   tabs.innerHTML='';
   S.tabs.forEach((t,i)=>{
     const group=document.createElement('div');group.className='tab-group';
     const b=document.createElement('button');b.className='tab'+(i===S.active?' on':'');b.textContent=t.name;
     b.setAttribute('aria-current',i===S.active?'page':'false');
-    b.onclick=()=>{if(S.active===i)return;S.active=i;save();render()};
+    b.onclick=()=>{const index=S.tabs.indexOf(t);if(S.active===index)return;S.active=index;save();render()};
     const options=document.createElement('button');options.className='tab-options';options.textContent='⋯';options.dataset.tabOptions=t.id;
     options.title='Options de l’onglet '+t.name;options.setAttribute('aria-label',options.title);options.onclick=()=>tabOptions(t);
-    group.append(b,options);tabs.appendChild(group);
+    const grip=document.createElement('button');grip.textContent='⠿';
+    group.append(grip,b,options);tabs.appendChild(group);
+    sortable(group,grip,t,()=>S.tabs,'.tab-group');
   });
   const a=document.createElement('button');a.className='tab-add';a.textContent='+';a.title='Nouvel onglet';a.setAttribute('aria-label',a.title);
   a.onclick=()=>{const n=prompt('Nom du nouvel onglet','Nouveau');if(!n?.trim())return;S.tabs.push({id:uid(),name:n.trim(),cards:[]});S.active=S.tabs.length-1;save();render()};tabs.appendChild(a);
@@ -478,11 +565,9 @@ function renderTabs(){
 function tabOptions(t){
   const index=S.tabs.indexOf(t);
   const o=modal('Gérer l’onglet',`<label class="f"><span>Nom de l’onglet</span><input class="in" id="tabName" value="${esc(t.name)}"></label>
-    <div class="btns"><button class="btn pri" id="renameTab">Renommer</button><button class="btn" id="tabLeft" ${index===0?'disabled':''}>← Déplacer à gauche</button><button class="btn" id="tabRight" ${index===S.tabs.length-1?'disabled':''}>Déplacer à droite →</button></div>
+    <div class="btns"><button class="btn pri" id="renameTab">Renommer</button></div>
     <div class="sep"></div><button class="btn" id="deleteTab" ${S.tabs.length===1?'disabled':''}>Supprimer cet onglet et ses cartes</button><p class="hint">Une sauvegarde est conservée avant suppression. Le dernier onglet ne peut pas être supprimé.</p>`);
   o.querySelector('#renameTab').onclick=()=>{const name=o.querySelector('#tabName').value.trim();if(!name)return;t.name=name;save();o.remove();renderTabs()};
-  const move=delta=>{const active=tab().id;S.tabs.splice(index+delta,0,S.tabs.splice(index,1)[0]);S.active=S.tabs.findIndex(x=>x.id===active);save();o.remove();renderTabs()};
-  o.querySelector('#tabLeft').onclick=()=>move(-1);o.querySelector('#tabRight').onclick=()=>move(1);
   o.querySelector('#deleteTab').onclick=()=>{
     if(S.tabs.length===1||!confirm('Supprimer « '+t.name+' » et ses '+t.cards.length+' carte(s) ?'))return;
     protectedChange(()=>{const active=tab().id;S.tabs.splice(index,1);S.active=Math.max(0,S.tabs.findIndex(x=>x.id===active));save();o.remove();preserveScroll(()=>render())});
@@ -494,7 +579,7 @@ function shell(c,extra){
   const el=document.createElement('section');
   el.className='card';el.dataset.id=c.id;el.dataset.type=c.type;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');
   el.innerHTML=`<div class="chead">
-    <span class="grip" title="Glisser pour déplacer">⠿</span>
+    <button class="grip" type="button" title="Glisser pour déplacer">⠿</button>
     <div class="ctitle" data-t>${esc(c.title)}</div>
     <div class="cact">${extra||''}<button class="iconbtn" data-options title="Renommer ou déplacer la carte" aria-label="Options de la carte ${esc(c.title)}">⋯</button><button class="iconbtn danger" data-del title="Supprimer la carte">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></div>
@@ -505,31 +590,18 @@ function shell(c,extra){
   t.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();t.blur()}};
   el.querySelector('[data-options]').onclick=()=>cardOptions(c,el);
   el.querySelector('[data-del]').onclick=()=>{if(!confirm('Supprimer « '+c.title+' » ?'))return;protectedChange(()=>{tab().cards=tab().cards.filter(x=>x.id!==c.id);save();preserveScroll(()=>render())})};
-  const g=el.querySelector('.grip');
-  g.onmousedown=()=>el.draggable=true;
-  el.addEventListener('dragstart',e=>{drag=c.id;el.classList.add('drag');e.dataTransfer.effectAllowed='move'});
-  el.addEventListener('dragend',()=>{el.draggable=false;el.classList.remove('drag');document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'))});
-  el.addEventListener('dragover',e=>{e.preventDefault();if(drag&&drag!==c.id)el.classList.add('over')});
-  el.addEventListener('dragleave',()=>el.classList.remove('over'));
-  el.addEventListener('drop',e=>{
-    e.preventDefault();el.classList.remove('over');
-    const cs=tab().cards,from=cs.findIndex(x=>x.id===drag),to=cs.findIndex(x=>x.id===c.id);
-    if(from<0||to<0||from===to)return;
-    cs.splice(to,0,cs.splice(from,1)[0]);save();preserveScroll(()=>render());
-  });
+  sortable(el,el.querySelector('.grip'),c,()=>tab().cards,'.card');
   return el;
 }
-let drag=null;
+
 
 function cardOptions(c,el){
   const source=tab(),index=source.cards.indexOf(c);
   const o=modal('Gérer la carte',`<label class="f"><span>Titre de la carte</span><input class="in" id="cardName" value="${esc(c.title)}"></label>
-    <div class="btns"><button class="btn pri" id="renameCard">Renommer</button><button class="btn" id="cardUp" ${index===0?'disabled':''}>↑ Monter</button><button class="btn" id="cardDown" ${index===source.cards.length-1?'disabled':''}>↓ Descendre</button></div>
+    <div class="btns"><button class="btn pri" id="renameCard">Renommer</button></div>
     <label class="f"><span>Déplacer vers l’onglet</span><select class="in" id="cardDestination">${S.tabs.map(t=>`<option value="${esc(t.id)}" ${t.id===source.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label><button class="btn" id="moveCard">Déplacer la carte</button>
     ${c.type==='notes'?`<div class="sep"></div><label class="f"><span>Largeur de la note sur ordinateur</span><select class="in" id="noteWidth"><option value="auto" ${!c.width||c.width==='auto'?'selected':''}>Large (par défaut)</option><option value="full" ${c.width==='full'?'selected':''}>Toute la largeur</option><option value="compact" ${c.width==='compact'?'selected':''}>Compacte</option></select></label><button class="btn" id="applyWidth">Appliquer la largeur</button>`:''}`);
   o.querySelector('#renameCard').onclick=()=>{const name=o.querySelector('#cardName').value.trim();if(!name)return;c.title=name;el.querySelector('[data-t]').textContent=name;save();o.remove()};
-  const move=delta=>{source.cards.splice(index+delta,0,source.cards.splice(index,1)[0]);save();o.remove();preserveScroll(()=>render())};
-  o.querySelector('#cardUp').onclick=()=>move(-1);o.querySelector('#cardDown').onclick=()=>move(1);
   o.querySelector('#moveCard').onclick=()=>{const dest=S.tabs.find(t=>t.id===o.querySelector('#cardDestination').value);if(!dest||dest===source)return;source.cards.splice(index,1);dest.cards.push(c);save();o.remove();preserveScroll(()=>render())};
   if(c.type==='notes')o.querySelector('#applyWidth').onclick=()=>{c.width=o.querySelector('#noteWidth').value;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');save();o.remove()};
 }
@@ -609,7 +681,7 @@ function renderTasks(c,body){
   const redraw=()=>preserveScroll(()=>renderTasks(c,body));
   c.items.forEach((it,i)=>{
     const r=document.createElement('div');r.className='task'+(it.d?' done':'');
-    r.innerHTML=`<button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><div class="task-actions"><button data-up title="Monter la tâche" aria-label="Monter la tâche" ${i===0?'disabled':''}>↑</button><button data-down title="Descendre la tâche" aria-label="Descendre la tâche" ${i===c.items.length-1?'disabled':''}>↓</button><button data-edit title="Modifier la tâche" aria-label="Modifier la tâche">✎</button><button data-delete title="Supprimer la tâche" aria-label="Supprimer la tâche">×</button></div>`;
+    r.innerHTML=`<button class="task-grip" type="button">⠿</button><button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><div class="task-actions"><button data-edit title="Modifier la tâche" aria-label="Modifier la tâche">✎</button><button data-delete title="Supprimer la tâche" aria-label="Supprimer la tâche">×</button></div>`;
     r.querySelector('.box').onclick=()=>{it.d=!it.d;save();r.classList.toggle('done',it.d);const b=r.querySelector('.box');b.textContent=it.d?'✓':'';b.setAttribute('aria-pressed',String(it.d));b.setAttribute('aria-label',it.d?'Marquer comme à faire':'Terminer la tâche');updateCount()};
     const edit=()=>{
       const o=modal('Modifier la tâche','<div id="taskEditor"></div><div class="btns"><button class="btn pri" id="saveTask">Enregistrer</button></div>');
@@ -617,9 +689,8 @@ function renderTasks(c,body){
       o.querySelector('#saveTask').onclick=()=>{const text=editorText(editor).trim();if(!text){alert('Saisissez un texte ou utilisez le bouton Supprimer.');return}it.t=text;it.html=sanitizeRich(editor.innerHTML);save();o.remove();redraw()};
     };
     r.querySelector('.txt').onclick=edit;r.querySelector('[data-edit]').onclick=edit;
-    r.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(i,1);save();redraw()})};
-    const move=delta=>{c.items.splice(i+delta,0,c.items.splice(i,1)[0]);save();redraw()};
-    r.querySelector('[data-up]').onclick=()=>move(-1);r.querySelector('[data-down]').onclick=()=>move(1);body.appendChild(r);
+    r.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(c.items.indexOf(it),1);save();redraw()})};
+    body.appendChild(r);sortable(r,r.querySelector('.task-grip'),it,()=>c.items,'.task');
   });
   const inp=document.createElement('input');inp.className='newtask';inp.placeholder='+ Nouvelle tâche... (Entrée)';inp.setAttribute('aria-label','Nouvelle tâche');
   inp.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&inp.value.trim()){e.preventDefault();c.items.push({t:inp.value.trim(),d:false});save();redraw();body.querySelector('.newtask').focus({preventScroll:true})}};
@@ -888,7 +959,7 @@ const DEFAULT_CLOUD={url:'',key:''};
 const CLOUD_KEY='startdeck.cloud.v1',SESSION_KEY='startdeck.session.v1';
 let cloud=DEFAULT_CLOUD,session=null,syncBusy=false,remoteConflict=null;
 try{cloud=JSON.parse(localStorage.getItem(CLOUD_KEY))||DEFAULT_CLOUD;session=JSON.parse(localStorage.getItem(SESSION_KEY))}catch{}
-function editing(){return !!document.querySelector('.overlay')||document.activeElement?.matches('input,textarea,[contenteditable="true"]')}
+function editing(){return !!activeSort||!!document.querySelector('.overlay')||document.activeElement?.matches('input,textarea,[contenteditable="true"]')}
 function refreshView(){applyTheme();engineName.textContent=ENGINES[S.settings.engine][0];render();headerWeather()}
 function validateCloud(url,key){
   const u=new URL(url);

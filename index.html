@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-30.2">
+<meta name="startdeck-build" content="2026-09-30.3">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -277,6 +277,26 @@ button:disabled{opacity:.35;cursor:default}
 .focus-mode .grid{display:block}.focus-mode .card:not(.is-focused){display:none}.focus-mode .is-focused{width:100%;max-width:1200px;margin:auto}
 .focus-mode .is-focused .notes{height:70vh;max-height:none}.focus-mode .is-focused [data-focus]{display:none}
 @media(max-width:700px){.card-heading{min-width:100px}.chead{padding:12px}.cact{gap:2px}#focusBar{align-items:flex-start}#focusTitle{font-size:14px}#exitFocus{font-size:13px}}
+/* Compact navigation: management controls appear only on demand. */
+.local-search{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:16px 0 8px}
+.local-search button{padding:8px 12px;min-height:44px;font-size:14px;background:var(--card)}
+.local-search #btnOrganize[aria-pressed=true]{color:var(--accent);border-color:var(--accent)}
+.tabs{margin:0 0 22px;gap:8px;align-items:stretch}
+.tab-group{background:transparent;border-color:transparent;border-radius:10px;max-width:100%}
+.tab-group .tab{min-height:44px;padding:9px 16px;color:var(--tx2);border-radius:10px;overflow-wrap:anywhere}
+.tab-group .tab.on{background:var(--accent);color:#14181f;font-weight:650}
+.tabs:not(.organizing) .tab-options,.tabs:not(.organizing) .sort-handle,.tabs:not(.organizing) .tab-add{display:none}
+.tabs.organizing{padding:10px;border:1px dashed var(--line);border-radius:12px}
+.tabs.organizing .tab-group{background:var(--card);border-color:var(--line)}
+.tabs.organizing .tab{padding-inline:10px}
+.tabs.organizing .tab-add{min-height:44px;min-width:44px}
+@media(max-width:640px){
+ .local-search{margin:10px 0 6px;justify-content:space-between}
+ .local-search button{border-color:transparent;background:transparent}
+ .tabs{gap:4px;margin-bottom:16px}
+ .tab-group .tab{padding:8px 13px;font-size:14px}
+ .tabs.organizing .tab{padding-inline:8px}
+}
 </style>
 </head>
 <body>
@@ -297,20 +317,20 @@ button:disabled{opacity:.35;cursor:default}
     <div class="engine">
       <button id="btnEngine" aria-haspopup="true"><span id="engineName">Google</span> <span style="font-size:9px">▼</span></button>
     </div>
-    <input id="q" placeholder="Rechercher sur le web ou dans vos favoris..." autocomplete="off" spellcheck="false">
+    <input id="q" placeholder="Rechercher sur le web…" autocomplete="off" spellcheck="false">
     <button class="go" id="btnGo" aria-label="Rechercher">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
     </button>
   </div>
 </div>
 
-<div class="local-search"><button id="btnFind">⌕ Rechercher dans mes tâches et notes</button></div>
+<div class="local-search"><button id="btnFind" aria-label="Rechercher dans mes tâches et notes" title="Rechercher dans tous les onglets (Ctrl+K)">⌕ Rechercher</button><button id="btnOrganize" aria-pressed="false" aria-controls="tabs">Organiser</button></div>
 <div id="focusBar" hidden><span id="focusTitle"></span><button id="exitFocus">← Revenir au tableau</button></div>
 <nav class="tabs" id="tabs"></nav>
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-30.2</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-30.3</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -578,6 +598,11 @@ function sortable(node,handle,item,getItems,selector,onReorder=()=>{}){
     handle.setPointerCapture?.(id);
   });
 }
+document.getElementById('btnOrganize').onclick=()=>{
+  const editing=tabs.classList.toggle('organizing');
+  const btn=document.getElementById('btnOrganize');
+  btn.setAttribute('aria-pressed',String(editing));btn.textContent=editing?'✓ Terminer':'Organiser';
+};
 function renderTabs(){
   tabs.innerHTML='';
   S.tabs.forEach((t,i)=>{

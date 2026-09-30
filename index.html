@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-27.1">
+<meta name="startdeck-build" content="2026-09-30.1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -219,21 +219,21 @@ label.f span{display:block;font-size:12.5px;color:var(--tx2);margin-bottom:7px}
 .tab-options{min-width:36px;min-height:42px;color:var(--tx2);font-size:22px;border-left:1px solid var(--line)}
 .tab-options:hover{color:var(--accent)}
 .note-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.note-toolbar button,.task-actions button{min-width:34px;min-height:34px;border:1px solid var(--line);border-radius:7px;color:var(--tx2)}
-.note-toolbar button:hover,.task-actions button:hover{background:var(--card2);color:var(--accent)}
+.note-toolbar button{min-width:34px;min-height:34px;border:1px solid var(--line);border-radius:7px;color:var(--tx2)}
+.note-toolbar button:hover{background:var(--card2);color:var(--accent)}
 .note-toolbar .editor-hint{font-size:12px;color:var(--tx3);margin-left:6px}
 .notes{display:block;height:clamp(280px,48vh,580px);min-height:220px;max-height:80vh;overflow:auto;resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;line-height:1.7;scrollbar-gutter:stable}
 .notes:focus{border-color:var(--accent)}
 .notes:empty::before{content:attr(data-placeholder);color:var(--tx3);pointer-events:none}
 .notes ul,.notes ol{padding-left:24px}.notes p{margin-bottom:.6em}
 .task .txt{overflow-wrap:anywhere;min-width:0;white-space:pre-wrap;text-align:left}
-.task-actions{display:flex;gap:4px;flex-wrap:wrap;flex:none}
+
 .task.done .txt{text-decoration:none}.task.done .txt>*{text-decoration:line-through}
 .task-editor{height:160px;min-height:120px}
 button:disabled{opacity:.35;cursor:default}
 .card[data-type="markets"] .cbody,.card[data-type="weather"] .cbody,.card[data-type="rss"] .cbody{min-height:240px}
 @media(max-width:1050px){.card,.card[data-compact="true"]{grid-column:span 6}.card[data-type="notes"],.card[data-wide="true"]{grid-column:1/-1}}
-@media(max-width:700px){.card,.card[data-compact="true"]{grid-column:1/-1}.notes{height:360px;max-height:none;font-size:16px}.task{flex-wrap:wrap}.task .txt{flex-basis:calc(100% - 40px)}.task-actions{margin-left:32px}.tab{padding:10px 12px}}
+@media(max-width:700px){.card,.card[data-compact="true"]{grid-column:1/-1}.notes{height:360px;max-height:none;font-size:16px}.tab{padding:10px 12px}}
 
 .sort-handle{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;flex:none;min-width:32px;min-height:36px;color:var(--tx2);border:1px solid transparent;border-radius:7px;font-size:20px;line-height:1;letter-spacing:0}
 .sort-handle:hover,.sort-handle:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
@@ -246,7 +246,18 @@ button:disabled{opacity:.35;cursor:default}
 .tab-group.sort-before::before,.tab-group.sort-after::after{top:0;bottom:0;width:3px;height:auto;right:auto}
 .tab-group.sort-before::before{left:-4px}.tab-group.sort-after::after{left:auto;right:-4px}
 .sort-ghost{position:fixed;z-index:10000;pointer-events:none;background:var(--card2);border:1px solid var(--accent);border-radius:9px;padding:9px 12px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 6px 24px #0008;left:-1000px;top:-1000px}
-@media(max-width:700px){.task .txt{flex-basis:calc(100% - 84px)}.task-actions{margin-left:72px}.sort-handle{min-width:38px;min-height:42px}}
+@media(max-width:700px){.sort-handle{min-width:38px;min-height:42px}}
+
+/* Compact task rows: one action control, aligned with the first text line. */
+.task{display:grid;grid-template-columns:30px 20px minmax(0,1fr) 40px;column-gap:8px;align-items:start;padding:7px 0}
+.task .sort-handle{width:30px;min-width:30px;min-height:44px}
+.task .box{margin-top:12px}
+.task .txt{padding:10px 0;min-height:44px;cursor:pointer}
+.task-options{width:40px;min-height:44px;border:1px solid transparent;border-radius:9px;color:var(--tx2);font-size:24px;line-height:1}
+.task-options:hover,.task-options:focus-visible{background:var(--card2);color:var(--accent);border-color:var(--line)}
+.task-preview{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;color:var(--tx2);max-height:30vh;overflow:auto}
+.task-menu{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.task-menu .btn{min-height:48px}.task-menu .task-delete{color:var(--down)}
 </style>
 </head>
 <body>
@@ -278,7 +289,7 @@ button:disabled{opacity:.35;cursor:default}
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-27.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-30.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -681,15 +692,21 @@ function renderTasks(c,body){
   const redraw=()=>preserveScroll(()=>renderTasks(c,body));
   c.items.forEach((it,i)=>{
     const r=document.createElement('div');r.className='task'+(it.d?' done':'');
-    r.innerHTML=`<button class="task-grip" type="button">⠿</button><button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><div class="task-actions"><button data-edit title="Modifier la tâche" aria-label="Modifier la tâche">✎</button><button data-delete title="Supprimer la tâche" aria-label="Supprimer la tâche">×</button></div>`;
+    r.innerHTML=`<button class="task-grip" type="button">⠿</button><button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><button class="task-options" data-task-options title="Actions de la tâche" aria-label="Actions de la tâche : ${esc(it.t)}" aria-haspopup="dialog">⋯</button>`;
     r.querySelector('.box').onclick=()=>{it.d=!it.d;save();r.classList.toggle('done',it.d);const b=r.querySelector('.box');b.textContent=it.d?'✓':'';b.setAttribute('aria-pressed',String(it.d));b.setAttribute('aria-label',it.d?'Marquer comme à faire':'Terminer la tâche');updateCount()};
     const edit=()=>{
       const o=modal('Modifier la tâche','<div id="taskEditor"></div><div class="btns"><button class="btn pri" id="saveTask">Enregistrer</button></div>');
       const editor=richEditor(o.querySelector('#taskEditor'),{text:it.t,html:it.html,label:'Texte de la tâche',className:'task-editor'});editor.id='taskText';
       o.querySelector('#saveTask').onclick=()=>{const text=editorText(editor).trim();if(!text){alert('Saisissez un texte ou utilisez le bouton Supprimer.');return}it.t=text;it.html=sanitizeRich(editor.innerHTML);save();o.remove();redraw()};
     };
-    r.querySelector('.txt').onclick=edit;r.querySelector('[data-edit]').onclick=edit;
-    r.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(c.items.indexOf(it),1);save();redraw()})};
+    r.querySelector('.txt').onclick=edit;
+    r.querySelector('[data-task-options]').onclick=()=>{
+      const o=modal('Actions de la tâche',`<p class="task-preview">${esc(it.t)}</p><div class="task-menu"><button class="btn" data-edit>Modifier</button><button class="btn task-delete" data-delete>Supprimer</button></div>`);
+      o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-label','Actions de la tâche');
+      o.querySelector('[data-edit]').onclick=()=>{o.remove();edit()};
+      o.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(c.items.indexOf(it),1);save();o.remove();redraw()})};
+      o.querySelector('[data-edit]').focus({preventScroll:true});
+    };
     body.appendChild(r);sortable(r,r.querySelector('.task-grip'),it,()=>c.items,'.task');
   });
   const inp=document.createElement('input');inp.className='newtask';inp.placeholder='+ Nouvelle tâche... (Entrée)';inp.setAttribute('aria-label','Nouvelle tâche');

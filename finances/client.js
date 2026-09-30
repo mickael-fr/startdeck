@@ -9,7 +9,7 @@
   async function send(path,body,token,method){
    const headers={apikey:config.key,'Content-Type':'application/json'};
    if(token)headers.Authorization='Bearer '+token;
-   if(path.includes('/rest/'))headers.Prefer='resolution=merge-duplicates,return=representation';
+   if(path.includes('/rest/'))headers.Prefer=path.includes('on_conflict=')?'resolution=merge-duplicates,return=representation':'return=representation';
    let r;try{r=await transport(config.url+path,{method:method||(body?'POST':'GET'),headers,cache:'no-store',body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)})}catch{throw Error('Connexion réseau indisponible. Réessaie sans te déconnecter.');}
    const result=await r.json().catch(()=>null);
    if(!r.ok){const e=Error(r.status===429?'Trop de tentatives. Patiente quelques minutes.':r.status===401?'Connexion expirée. Saisis ton code personnel.':path.includes('grant_type=password')?'Adresse ou code incorrect.':path==='/auth/v1/user'?'Code refusé. Essaie un code plus long ou reconnecte-toi.':'Demande refusée. Réessaie ou reconnecte-toi.');e.status=r.status;throw e;}return result;
@@ -39,6 +39,12 @@
    async verify(email,token){clear();return keep(await send('/auth/v1/verify',{email,token,type:'email'}));},
    async setCode(password){const user=await request('/auth/v1/user',{password,data:{personal_code:true}},true,'PUT');return keep({...session,user});},
    read:()=>request('/rest/v1/finance_snapshots?select=snapshot,updated_at',null,true),
+   async save(snapshot,previous){
+    const body={snapshot,updated_at:new Date().toISOString()};
+    if(!previous){await request('/rest/v1/finance_snapshots',{...body,owner_id:session?.user?.id},true);return;}
+    const rows=await request('/rest/v1/finance_snapshots?owner_id=eq.'+encodeURIComponent(session?.user?.id)+'&updated_at=eq.'+encodeURIComponent(previous),body,true,'PATCH');
+    if(!rows?.length)throw Error('Les données ont changé sur un autre appareil. Actualise puis réessaie : ta modification n’a pas été enregistrée.');
+   },
    sync:snapshot=>request('/rest/v1/finance_snapshots?on_conflict=owner_id',{owner_id:session?.user?.id,snapshot,updated_at:new Date().toISOString()},true),
    async logout(){const token=session?.access_token;clear();if(token)try{await send('/auth/v1/logout?scope=local',null,token,'POST')}catch{}},
    forget(){clear();}

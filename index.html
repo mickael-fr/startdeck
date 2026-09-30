@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-30.1">
+<meta name="startdeck-build" content="2026-09-30.2">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -258,6 +258,25 @@ button:disabled{opacity:.35;cursor:default}
 .task-preview{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;color:var(--tx2);max-height:30vh;overflow:auto}
 .task-menu{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
 .task-menu .btn{min-height:48px}.task-menu .task-delete{color:var(--down)}
+
+.card-heading{flex:1;min-width:90px}.card-heading .ctitle{margin:0;padding:2px 0}
+.card-summary{display:block;font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.card[data-type="notes"]:not([data-collapsed="true"]) .card-summary{display:none}
+.card[data-collapsed="true"] .cbody{display:none}.card[data-collapsed="true"] .chead{border-bottom:0}
+.cact{flex-wrap:wrap}.cact [data-collapse],.cact [data-focus]{font-size:20px;min-height:36px;min-width:32px}
+.tasks-done{border-top:1px solid var(--line);margin-top:12px;padding-top:6px}.tasks-done[hidden]{display:none}
+.tasks-done>summary{cursor:pointer;padding:12px 4px;color:var(--tx2);font-size:14px;min-height:44px}
+.local-search{text-align:center;margin:12px 0}.local-search button{padding:10px 16px;border:1px solid var(--line);border-radius:10px;color:var(--tx2);min-height:44px}
+.local-search button:hover{color:var(--accent);border-color:var(--accent)}
+.find-result{display:block;width:100%;text-align:left;padding:14px 10px;border-bottom:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.find-result:hover,.find-result:focus-visible{background:var(--card)}.find-result strong{display:block;font-size:14px}.find-result span{display:block;color:var(--tx2);font-size:13px;margin-top:6px;line-height:1.5}
+.search-hit{outline:2px solid var(--accent);outline-offset:-2px}
+#focusBar{position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+#focusBar[hidden]{display:none}#focusTitle{font-weight:600;overflow-wrap:anywhere}#exitFocus{flex:none;border:1px solid var(--line);padding:12px;border-radius:10px;color:var(--accent)}
+.focus-mode .top,.focus-mode .searchwrap,.focus-mode .local-search,.focus-mode .tabs,.focus-mode #btnAddCard,.focus-mode footer{display:none}
+.focus-mode .grid{display:block}.focus-mode .card:not(.is-focused){display:none}.focus-mode .is-focused{width:100%;max-width:1200px;margin:auto}
+.focus-mode .is-focused .notes{height:70vh;max-height:none}.focus-mode .is-focused [data-focus]{display:none}
+@media(max-width:700px){.card-heading{min-width:100px}.chead{padding:12px}.cact{gap:2px}#focusBar{align-items:flex-start}#focusTitle{font-size:14px}#exitFocus{font-size:13px}}
 </style>
 </head>
 <body>
@@ -285,11 +304,13 @@ button:disabled{opacity:.35;cursor:default}
   </div>
 </div>
 
+<div class="local-search"><button id="btnFind">⌕ Rechercher dans mes tâches et notes</button></div>
+<div id="focusBar" hidden><span id="focusTitle"></span><button id="exitFocus">← Revenir au tableau</button></div>
 <nav class="tabs" id="tabs"></nav>
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-30.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-09-30.2</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){
@@ -488,7 +509,7 @@ function protectedChange(action){
 // Pointer events share one sortable implementation for mouse, pen and touch.
 // Only the handle starts a gesture; data and DOM move together on release.
 let activeSort=null;
-function sortable(node,handle,item,getItems,selector){
+function sortable(node,handle,item,getItems,selector,onReorder=()=>{}){
   handle.classList.add('sort-handle');
   handle.title='Glisser pour déplacer · clavier : flèches, Début ou Fin';
   handle.setAttribute('aria-label','Déplacer '+(item.title||item.name||item.t));
@@ -500,7 +521,7 @@ function sortable(node,handle,item,getItems,selector){
     const active=tab();
     list.splice(index,0,list.splice(from,1)[0]);
     node.parentElement.insertBefore(node,index>from?nodes[index].nextSibling:nodes[index]);
-    S.active=S.tabs.indexOf(active);save();
+    S.active=S.tabs.indexOf(active);onReorder(list);save();
     if(!storageFailed)setSaveStatus('Ordre enregistré · position '+(index+1)+' sur '+list.length);
   }
   handle.addEventListener('keydown',e=>{
@@ -585,16 +606,46 @@ function tabOptions(t){
   };
 }
 
+/* ---------- presentation without rebuilding editors ---------- */
+let focusCard=null,focusScroll=0;
+function updateCardSummary(c,el){
+  const summary=el?.querySelector('.card-summary');if(!summary)return;
+  if(c.type==='tasks'){const left=(c.items||[]).filter(x=>!x.d).length;summary.textContent=left+' à faire · '+(c.items||[]).filter(x=>x.d).length+' terminées'}
+  else if(c.type==='links')summary.textContent=(c.items||[]).length+' favoris';
+  else if(c.type==='notes')summary.textContent=(c.text||'').trim().replace(/\s+/g,' ').slice(0,90)||'Note vide';
+  else summary.textContent='';
+}
+function setCollapsed(c,el,collapsed){
+  c.collapsed=collapsed;el.dataset.collapsed=String(collapsed);
+  const b=el.querySelector('[data-collapse]');b.textContent=collapsed?'▸':'▾';b.setAttribute('aria-expanded',String(!collapsed));b.title=b.ariaLabel=(collapsed?'Déplier':'Replier')+' la carte';
+}
+function enterFocus(c,el){
+  if(focusCard)exitFocus(false);focusScroll=window.scrollY;focusCard=el;
+  if(c.collapsed){setCollapsed(c,el,false);save()}
+  el.classList.add('is-focused');document.body.classList.add('focus-mode');
+  document.getElementById('focusTitle').textContent=c.title;document.getElementById('focusBar').hidden=false;
+  document.getElementById('exitFocus').focus({preventScroll:true});window.scrollTo(0,0);
+}
+function exitFocus(restore=true){
+  const previous=focusCard;focusCard=null;previous?.classList.remove('is-focused');document.body.classList.remove('focus-mode');document.getElementById('focusBar').hidden=true;
+  if(restore){window.scrollTo(0,focusScroll);previous?.querySelector('[data-focus]')?.focus({preventScroll:true})}
+}
+document.getElementById('exitFocus').onclick=()=>exitFocus();
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focusCard&&!document.querySelector('.overlay')&&!activeSort){e.preventDefault();exitFocus()}});
+
 /* ---------- cards ---------- */
 function shell(c,extra){
   const el=document.createElement('section');
-  el.className='card';el.dataset.id=c.id;el.dataset.type=c.type;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');
+  el.className='card';el.dataset.collapsed=String(!!c.collapsed);el.dataset.id=c.id;el.dataset.type=c.type;el.dataset.wide=String(c.width==='full');el.dataset.compact=String(c.width==='compact');
   el.innerHTML=`<div class="chead">
     <button class="grip" type="button" title="Glisser pour déplacer">⠿</button>
-    <div class="ctitle" data-t>${esc(c.title)}</div>
-    <div class="cact">${extra||''}<button class="iconbtn" data-options title="Renommer ou déplacer la carte" aria-label="Options de la carte ${esc(c.title)}">⋯</button><button class="iconbtn danger" data-del title="Supprimer la carte">
+    <div class="card-heading"><div class="ctitle" data-t>${esc(c.title)}</div><span class="card-summary"></span></div>
+    <div class="cact"><button class="iconbtn" data-collapse aria-expanded="${!c.collapsed}" title="${c.collapsed?'Déplier':'Replier'} la carte" aria-label="${c.collapsed?'Déplier':'Replier'} la carte">${c.collapsed?'▸':'▾'}</button>${['notes','tasks'].includes(c.type)?'<button class="iconbtn" data-focus title="Mode concentration" aria-label="Mode concentration">⛶</button>':''}${extra||''}<button class="iconbtn" data-options title="Renommer ou déplacer la carte" aria-label="Options de la carte ${esc(c.title)}">⋯</button><button class="iconbtn danger" data-del title="Supprimer la carte">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></div>
   </div><div class="cbody"></div>`;
+  updateCardSummary(c,el);
+  el.querySelector('[data-collapse]').onclick=()=>{if(focusCard===el)exitFocus();setCollapsed(c,el,!c.collapsed);save()};
+  const focus=el.querySelector('[data-focus]');if(focus)focus.onclick=()=>enterFocus(c,el);
   const t=el.querySelector('[data-t]');
   t.onclick=()=>{t.contentEditable='true';t.focus();document.execCommand&&document.getSelection().selectAllChildren(t)};
   t.onblur=()=>{t.contentEditable='false';c.title=t.textContent.trim()||'Sans titre';t.textContent=c.title;save()};
@@ -683,17 +734,24 @@ function richEditor(container,{text='',html,save:commit,label='Note',className='
   container.append(toolbar,editor);return editor;
 }
 function renderNotes(c,body){
-  richEditor(body,{text:c.text||'',html:c.html,label:'Note : '+c.title,save:(text,html)=>{c.text=text;c.html=html;save()}});
+  richEditor(body,{text:c.text||'',html:c.html,label:'Note : '+c.title,save:(text,html)=>{c.text=text;c.html=html;save();updateCardSummary(c,body.closest('.card'))}});
 }
 function renderTasks(c,body){
-  c.items=c.items||[];body.innerHTML='';
+  c.items=c.items||[];const wasOpen=body.querySelector('.tasks-done')?.open??!!c.showDone;body.innerHTML='';
+  const openList=document.createElement('div');openList.className='tasks-open';
+  const done=document.createElement('details');done.className='tasks-done';done.open=wasOpen;
+  const summary=document.createElement('summary');summary.textContent='Terminées ('+c.items.filter(x=>x.d).length+')';
+  const doneList=document.createElement('div');done.append(summary,doneList);done.hidden=!c.items.some(x=>x.d);
+  done.ontoggle=()=>{if(done.isConnected&&c.showDone!==done.open){c.showDone=done.open;save()}};
+  body.append(openList,done);
   const count=document.createElement('div');count.className='count';
   const updateCount=()=>{const n=c.items.filter(x=>!x.d).length;count.textContent=n?n+' restante'+(n>1?'s':''):'Tout est fait 🎉'};
   const redraw=()=>preserveScroll(()=>renderTasks(c,body));
+  const rows=new Map();
   c.items.forEach((it,i)=>{
-    const r=document.createElement('div');r.className='task'+(it.d?' done':'');
+    const r=document.createElement('div');r.className='task'+(it.d?' done':'');r.dataset.taskIndex=i;
     r.innerHTML=`<button class="task-grip" type="button">⠿</button><button class="box" aria-label="${it.d?'Marquer comme à faire':'Terminer la tâche'}" aria-pressed="${!!it.d}">${it.d?'✓':''}</button><button class="txt" title="Modifier la tâche"><span>${it.html?sanitizeRich(it.html):esc(it.t)}</span></button><button class="task-options" data-task-options title="Actions de la tâche" aria-label="Actions de la tâche : ${esc(it.t)}" aria-haspopup="dialog">⋯</button>`;
-    r.querySelector('.box').onclick=()=>{it.d=!it.d;save();r.classList.toggle('done',it.d);const b=r.querySelector('.box');b.textContent=it.d?'✓':'';b.setAttribute('aria-pressed',String(it.d));b.setAttribute('aria-label',it.d?'Marquer comme à faire':'Terminer la tâche');updateCount()};
+    r.querySelector('.box').onclick=()=>{it.d=!it.d;save();redraw();updateCardSummary(c,body.closest('.card'))};
     const edit=()=>{
       const o=modal('Modifier la tâche','<div id="taskEditor"></div><div class="btns"><button class="btn pri" id="saveTask">Enregistrer</button></div>');
       const editor=richEditor(o.querySelector('#taskEditor'),{text:it.t,html:it.html,label:'Texte de la tâche',className:'task-editor'});editor.id='taskText';
@@ -707,11 +765,16 @@ function renderTasks(c,body){
       o.querySelector('[data-delete]').onclick=()=>{if(confirm('Supprimer cette tâche ?'))protectedChange(()=>{c.items.splice(c.items.indexOf(it),1);save();o.remove();redraw()})};
       o.querySelector('[data-edit]').focus({preventScroll:true});
     };
-    body.appendChild(r);sortable(r,r.querySelector('.task-grip'),it,()=>c.items,'.task');
+    (it.d?doneList:openList).appendChild(r);
+    sortable(r,r.querySelector('.task-grip'),it,()=>c.items.filter(x=>!!x.d===!!it.d),'.task',ordered=>{
+      let i=0;c.items=c.items.map(x=>!!x.d===!!it.d?ordered[i++]:x);
+      body.querySelectorAll('.task').forEach(row=>{const item=rows.get(row);row.dataset.taskIndex=c.items.indexOf(item)});
+    });rows.set(r,it);
   });
   const inp=document.createElement('input');inp.className='newtask';inp.placeholder='+ Nouvelle tâche... (Entrée)';inp.setAttribute('aria-label','Nouvelle tâche');
   inp.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&inp.value.trim()){e.preventDefault();c.items.push({t:inp.value.trim(),d:false});save();redraw();body.querySelector('.newtask').focus({preventScroll:true})}};
-  body.append(inp,count);updateCount();
+  body.append(inp,count);updateCount();updateCardSummary(c,body.closest('.card'));
+  if(!c.items.some(x=>!x.d)){const empty=document.createElement('p');empty.className='muted';empty.textContent=c.items.length?'Toutes les tâches sont terminées.':'Ajoutez votre première tâche ci-dessous.';openList.appendChild(empty)}
 }
 
 async function renderWeather(c,body){
@@ -760,6 +823,7 @@ const REFRESH='<button class="iconbtn" data-refresh title="Rafraîchir"><svg wid
 const CFG='<button class="iconbtn" data-cfg title="Configurer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.6"/><path d="M4 12h3M17 12h3M12 4v3M12 17v3"/></svg></button>';
 
 function render(){
+  if(focusCard)exitFocus(false);
   const scrollX=window.scrollX,scrollY=window.scrollY;
   renderTabs();
   grid.innerHTML='';
@@ -927,6 +991,41 @@ btnEngine.onclick=e=>{
 };
 document.addEventListener('click',()=>{const m=document.querySelector('.menu');if(m)m.remove()});
 
+function openFind(){
+  const o=modal('Rechercher dans StartDeck','<label class="f"><span>Tâches, notes, cartes et favoris — tous les onglets</span><input class="in" id="findQuery" placeholder="Ex. contrat, réunion, trading…" autocomplete="off"></label><p id="findCount" role="status" class="hint"></p><div id="findResults"></div>');
+  const input=o.querySelector('#findQuery'),results=o.querySelector('#findResults'),count=o.querySelector('#findCount');
+  const fold=text=>String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  function search(){
+    results.replaceChildren();const terms=fold(input.value).trim().split(/\s+/).filter(Boolean);
+    if(!terms.length){count.textContent='Saisissez un mot pour retrouver vos contenus.';return}
+    const matches=[];
+    S.tabs.forEach((t,ti)=>t.cards.forEach(c=>{
+      const add=(text,label,item)=>{if(terms.every(term=>fold(t.name+' '+c.title+' '+text).includes(term)))matches.push({t,ti,c,text,label,item})};
+      if(c.type==='notes')add(c.text||'','Note');
+      else if(c.type==='tasks')(c.items||[]).forEach(item=>add(item.t,item.d?'Tâche terminée':'Tâche',item));
+      else if(c.type==='links')(c.items||[]).forEach(item=>add(item.t+' '+item.u,'Favori',item));
+      else add(c.title,'Carte');
+    }));
+    count.textContent=matches.length?(matches.length>50?'50 premiers résultats sur '+matches.length:matches.length+' résultat(s)'):'Aucun résultat.';
+    matches.slice(0,50).forEach(hit=>{
+      const b=document.createElement('button');b.className='find-result';
+      const title=document.createElement('strong');title.textContent=hit.t.name+' › '+hit.c.title;
+      const snippet=document.createElement('span');snippet.textContent=hit.label+' · '+hit.text.slice(0,180);b.append(title,snippet);
+      b.onclick=()=>{
+        o.remove();if(focusCard)exitFocus(false);S.active=hit.ti;hit.c.collapsed=false;save();render();
+        const el=[...grid.children].find(x=>x.dataset.id===hit.c.id);if(!el)return;
+        if(hit.item?.d){const done=el.querySelector('.tasks-done');if(done)done.open=true}
+        const target=hit.c.type==='tasks'?el.querySelector('[data-task-index="'+hit.c.items.indexOf(hit.item)+'"]'):el;
+        (target||el).classList.add('search-hit');
+        requestAnimationFrame(()=>{if(!(target||el).isConnected)return;(target||el).scrollIntoView?.({block:'center'});const control=target?.querySelector('.txt')||el.querySelector('[data-collapse]');control?.focus({preventScroll:true})});
+        setTimeout(()=>(target||el).classList.remove('search-hit'),3000);
+      };results.appendChild(b);
+    });
+  }
+  input.oninput=search;input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();results.querySelector('button')?.click()}};search();input.focus({preventScroll:true});
+}
+document.getElementById('btnFind').onclick=openFind;
+
 function allLinks(){
   const out=[];
   S.tabs.forEach(t=>t.cards.forEach(c=>{if(c.type==='links')(c.items||[]).forEach(i=>out.push({...i,tab:t.name}))}));
@@ -967,7 +1066,7 @@ q.addEventListener('blur',()=>setTimeout(()=>document.querySelector('.sugg')?.re
 btnGo.onclick=runSearch;
 document.addEventListener('keydown',e=>{
   if(e.target.matches('input,textarea,[contenteditable=true]'))return;
-  if(e.key==='/'||(e.key==='k'&&(e.metaKey||e.ctrlKey))){e.preventDefault();q.focus()}
+  if(e.key==='k'&&(e.metaKey||e.ctrlKey)){e.preventDefault();openFind()}else if(e.key==='/'){e.preventDefault();q.focus()}
 });
 
 /* ---------- synchronisation privée : configuration facultative ---------- */

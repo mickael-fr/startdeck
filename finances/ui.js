@@ -41,7 +41,7 @@ function updateMonthly(snapshot){
 $('operations').addEventListener('change',async e=>{
  const select=e.target;if(!select.dataset.id)return;
  if(writing){renderOps();return;}writing=true;
- $('operations').querySelectorAll('select').forEach(el=>el.disabled=true);
+ $('operations').querySelectorAll('select,button').forEach(el=>el.disabled=true);
  try{
  const latest=(await cloud.read())[0];if(!latest?.snapshot)throw Error('Aucune donnée synchronisée.');
  const current=data.operations.find(o=>o.id===Number(select.dataset.id)),snapshot=structuredClone(latest.snapshot),op=snapshot.operations.find(o=>o.id===current?.id);
@@ -49,10 +49,25 @@ $('operations').addEventListener('change',async e=>{
  const category=select.value;if(!Object.hasOwn(CATEGORY_KINDS,category))throw Error('Catégorie inconnue.');
  if(op.category!==category){
  const edit={event_id:crypto.randomUUID(),id:op.id,date:op.date,amount:op.amount,label:op.label,before:op.category,category};
- snapshot.pending_edits=[...(snapshot.pending_edits||[]),edit];op.category=category;op.kind=CATEGORY_KINDS[category]==='expense'&&op.amount>0?'refund':CATEGORY_KINDS[category];updateMonthly(snapshot);
+ snapshot.pending_edits=[...(snapshot.pending_edits||[]),edit];op.reviewed_at=null;op.category=category;op.kind=CATEGORY_KINDS[category]==='expense'&&op.amount>0?'refund':CATEGORY_KINDS[category];updateMonthly(snapshot);
  await cloud.save(snapshot,latest.updated_at);
  }
  showSnapshot((await cloud.read())[0]);notice('Catégorie enregistrée. La règle sera reprise sur le PC à la prochaine synchronisation.');
+ }catch(err){notice(err.message);renderOps();}finally{writing=false;}
+});
+$('operations').addEventListener('click',async e=>{
+ const button=e.target.closest('[data-review]');if(!button||writing||!data)return;
+ const current=structuredClone(data.operations.find(o=>o.id===Number(button.dataset.review)));
+ writing=true;$('operations').querySelectorAll('select,button').forEach(el=>el.disabled=true);
+ try{
+ const latest=(await cloud.read())[0],snapshot=structuredClone(latest?.snapshot),op=snapshot?.operations.find(o=>o.id===current.id);
+ if(!op||['date','amount','label','category'].some(k=>op[k]!==current[k])||(op.reviewed_at||null)!==(current.reviewed_at||null))throw Error('Cette opération a changé sur un autre appareil. Actualise avant de la valider.');
+ if(op.category==='À classer')throw Error('Choisis une catégorie avant de valider.');
+ const reviewed_at=op.reviewed_at?null:new Date().toISOString();
+ snapshot.pending_edits=[...(snapshot.pending_edits||[]),{event_id:crypto.randomUUID(),type:'review',id:op.id,date:op.date,amount:op.amount,label:op.label,category:op.category,before_reviewed_at:op.reviewed_at||null,reviewed_at}];
+ op.reviewed_at=reviewed_at;
+ await cloud.save(snapshot,latest.updated_at);showSnapshot((await cloud.read())[0]);
+ notice(reviewed_at?'Opération validée et enregistrée.':'Opération remise à vérifier.');
  }catch(err){notice(err.message);renderOps();}finally{writing=false;}
 });
 async function opened(){loggedIn();await (isLocal?syncPC():refresh());}
@@ -67,7 +82,7 @@ $('change-code').onclick=()=>{$('setup-form').hidden=false;};
 $('refresh-cloud').onclick=e=>action(e.target,()=>isLocal?syncPC():refresh());
 $('sync-cloud').onclick=e=>action(e.target,syncPC);
 $('logout-cloud').onclick=e=>action(e.target,async()=>{const done=cloud.logout();loggedOut();await done;status('Déconnecté de cet appareil.');});
-$('month').onchange=()=>data&&render();$('search').oninput=()=>data&&renderOps();$('catfilter').onchange=()=>data&&renderOps();
+$('reviewfilter').onchange=()=>data&&renderOps();$('month').onchange=()=>data&&render();$('search').oninput=()=>data&&renderOps();$('catfilter').onchange=()=>data&&renderOps();
 // Session uniquement : aucun PDF, code personnel ou relevé n'est stocké hors connexion.
 addEventListener('storage',e=>{if(e.key?.startsWith('cost-killer.session.')&&e.newValue===null){cloud.forget();loggedOut();}});
 addEventListener('pageshow',e=>{if(e.persisted)action(null,async()=>{clearView();if(await cloud.restore())await opened();else loggedOut();});});

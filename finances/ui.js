@@ -47,12 +47,13 @@ $('operations').addEventListener('change',async e=>{
  const current=data.operations.find(o=>o.id===Number(select.dataset.id)),snapshot=structuredClone(latest.snapshot),op=snapshot.operations.find(o=>o.id===current?.id);
  if(!op||['date','amount','label','category'].some(k=>op[k]!==current[k]))throw Error('Cette opération a changé sur un autre appareil. Actualise avant de la reclasser.');
  const category=select.value;if(!Object.hasOwn(CATEGORY_KINDS,category))throw Error('Catégorie inconnue.');
- if(op.category!==category){
- const edit={event_id:crypto.randomUUID(),id:op.id,date:op.date,amount:op.amount,label:op.label,before:op.category,category};
- snapshot.pending_edits=[...(snapshot.pending_edits||[]),edit];op.reviewed_at=null;op.category=category;op.kind=CATEGORY_KINDS[category]==='expense'&&op.amount>0?'refund':CATEGORY_KINDS[category];updateMonthly(snapshot);
- await cloud.save(snapshot,latest.updated_at);
+ const peers=category==='À classer'?[]:categoryPeers(snapshot,op),targets=[...(op.category!==category?[op]:[]),...peers];
+ for(const target of targets){
+ const edit={event_id:crypto.randomUUID(),id:target.id,date:target.date,amount:target.amount,label:target.label,before:target.category,category};
+ snapshot.pending_edits=[...(snapshot.pending_edits||[]),edit];target.reviewed_at=null;target.category=category;target.category_manual=true;target.kind=CATEGORY_KINDS[category]==='expense'&&target.amount>0?'refund':CATEGORY_KINDS[category];
  }
- showSnapshot((await cloud.read())[0]);notice('Catégorie enregistrée. La règle sera reprise sur le PC à la prochaine synchronisation.');
+ if(targets.length){updateMonthly(snapshot);await cloud.save(snapshot,latest.updated_at);}
+ showSnapshot((await cloud.read())[0]);notice('Catégorie enregistrée ; '+peers.length+' autre(s) opération(s) similaire(s) classée(s). La règle sera reprise sur le PC à la prochaine synchronisation.');
  }catch(err){notice(err.message);renderOps();}finally{writing=false;}
 });
 $('operations').addEventListener('click',async e=>{

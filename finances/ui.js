@@ -4,7 +4,7 @@ const cloud=FinanceClient.createClient(FINANCE_CLOUD,fetch,authStorage);
 const isLocal=['localhost','127.0.0.1'].includes(location.hostname);
 let cloudRecord=null,writing=false;
 const status=s=>{$('cloud-status').textContent=s};
-function clearView(){data=null;$('overview').hidden=true;$('mobile-nav').hidden=true;for(const id of ['operations','checks','monthly','categories','recurrences','alerts','merchants','game-chart','game-quests','rank-path'])$(id).replaceChildren();}
+function clearView(){data=null;$('overview').hidden=true;$('mobile-nav').hidden=true;for(const id of ['campaign','campaign-progress','operations','checks','monthly','categories','recurrences','alerts','merchants','game-chart','game-quests','rank-path'])$(id).replaceChildren();$('campaign-toast').hidden=true;}
 function loggedOut(){clearView();$('session-tools').hidden=true;$('setup-form').hidden=true;$('email-form').hidden=false;$('recover-panel').hidden=false;$('login-help').hidden=false;$('password').value='';$('new-code').value='';$('confirm-code').value='';$('cloud-account').textContent='';$('cloud-freshness').textContent='';}
 function loggedIn(){ $('email-form').hidden=true;$('recover-panel').hidden=true;$('login-help').hidden=true;$('session-tools').hidden=false;$('sync-cloud').hidden=!isLocal;$('cloud-account').textContent='Compte : '+(cloud.user()?.email||'connecté');}
 function showSnapshot(record){
@@ -71,6 +71,17 @@ $('operations').addEventListener('click',async e=>{
  notice(reviewed_at?'Opération validée et enregistrée.':'Opération remise à vérifier.');
  }catch(err){notice(err.message);renderOps();}finally{writing=false;}
 });
+if(window.Campaign)window.Campaign.save=async(key,value,before)=>{
+ if(writing)throw Error('Un enregistrement est déjà en cours. Réessaie dans un instant.');writing=true;
+ try{
+ const latest=(await cloud.read())[0];if(!latest?.snapshot)throw Error('Aucune donnée synchronisée.');
+ const snapshot=structuredClone(latest.snapshot),existing=snapshot.campaign_choices?.[key]||null;
+ if(JSON.stringify(existing)!==JSON.stringify(before))throw Error('Ce choix a changé sur un autre appareil. Actualise avant de réessayer.');
+ snapshot.campaign_choices={...(snapshot.campaign_choices||{}),[key]:value};
+ snapshot.pending_edits=[...(snapshot.pending_edits||[]),{event_id:crypto.randomUUID(),type:'campaign',key,value,before}];
+ await cloud.save(snapshot,latest.updated_at);showSnapshot((await cloud.read())[0]);
+ }finally{writing=false;}
+};
 async function opened(){loggedIn();await (isLocal?syncPC():refresh());}
 async function action(button,fn){if(button)button.disabled=true;try{await fn()}catch(e){status(e.message);if(!cloud.user())loggedOut();}finally{if(button)button.disabled=false;}}
 $('email-form').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{const code=$('password').value;try{await cloud.signIn($('email').value.trim(),code)}finally{$('password').value=''}await opened();})};

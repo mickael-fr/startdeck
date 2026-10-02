@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-09-30.3">
+<meta name="startdeck-build" content="2026-10-02.1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -297,6 +297,11 @@ button:disabled{opacity:.35;cursor:default}
  .tab-group .tab{padding:8px 13px;font-size:14px}
  .tabs.organizing .tab{padding-inline:8px}
 }
+/* A lone card must use the available width, including compact cards. */
+.grid > .card:only-child{grid-column:1/-1}
+@media(min-width:701px) and (max-width:1200px){
+ .grid > .card[data-type="tasks"]{grid-column:1/-1}
+}
 </style>
 </head>
 <body>
@@ -330,7 +335,7 @@ button:disabled{opacity:.35;cursor:default}
 <main class="grid" id="grid"></main>
 <button class="addcard" id="btnAddCard">+ Ajouter une carte</button>
 <div class="savebar"><span id="saveStatus" role="status" aria-live="polite">Sauvegarde locale</span><button id="btnSync">Synchronisation</button><button id="btnUpdate" hidden>Nouvelle version disponible</button></div>
-<footer>StartDeck · <span id="buildLabel">2026-09-30.3</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
+<footer>StartDeck · <span id="buildLabel">2026-10-02.1</span> · Vos données restent sur cet appareil tant que la synchronisation n’est pas activée.</footer>
 
 <script id="startdeck-core">
 function safeUrl(value){

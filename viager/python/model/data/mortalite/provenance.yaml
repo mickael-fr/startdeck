@@ -1,0 +1,81 @@
+checked_at: '2026-10-06'
+config_path: config/mortalite.yaml
+config_sha256: e80ba7f814a2b9e398ab2e0aa54d53fb6f230100fb682cdf330a34c7f8b8f047
+effective_config:
+  tgh05_tgf05:
+    published_max_age: 120
+    generation_start_reference_year: 1996
+    terminal_age: 120
+    terminal_qx: 1.0
+    terminal_note: Fermeture artificielle à 121 ans lorsque lx120 est positif.
+  insee:
+    period: 2022
+    official_max_age: 100
+    fit_age_min: 90
+    fit_age_max: 100
+    anchor_age: 100
+    terminal_age: 120
+    terminal_qx: 1.0
+    tail_method: logistic_qx_kannisto
+    tail_note: Quotients logistiques ajustés aux âges 90..100, ancrés au q100 officiel
+      ; extrapolation explicite, pas table officielle.
+tgh05_tgf05:
+  canonical_url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000000820127
+  download_url: https://www.moneyvox.fr/r/rente_viagere_2007.pdf
+  nature: Miroir du JO du 26 août 2006, arrêté du 1 août 2006, texte 11 ; téléchargement
+    PDF canonical bloqué 403
+  input_sha256: 1cfd86125fd52c58d6af2f8c46d5587540727beda3ff81e739a193067ea94630
+  output_sha256: dde68de650b0d80e691c1aa0c489736c3ff45d209bb4aa79eb2a8c83f48dadb2
+  published_cells_extracted: 16013
+  csv_rows: 16340
+  sex_tables:
+    F: TGF05
+    M: TGH05
+  cohorts:
+  - 1900
+  - 2005
+  qx_formula: 1 - lx(age+1,generation)/lx(age,generation)
+  missing_early_ages: Cellules JO non publiées avant début de cohorte ; aucun qx inventé
+    en amont.
+  terminal: Fermeture artificielle à 121 ans lorsque lx120 est positif.
+  official_cross_checks:
+    official_pdf_url: https://www.legifrance.gouv.fr/download/file/uOcm9LEDRRuSQGajABE_KTFlVRKUN-sUNk3r-G5ek4A=/JOE_TEXTE
+    method: Lecture indépendante du PDF canonical par web, comparaison de cellules
+      aux CSV extraits du miroir. Identité binaire complète non confirmée.
+    cells:
+    - TGF05 génération1910 âge87 lx93645 (page4)
+    - TGF05 génération1950 âge80 lx85605 (page11)
+    - TGF05 génération1998 âge120 lx355 (page19)
+    - TGH05 génération1999 âge119 lx192 (page38)
+insee:
+  url: https://www.insee.fr/fr/statistiques/fichier/8210111/T69QMORT.xlsx
+  input_sha256: b4fbdbb49ba738a021355c8d1dfa47b6ad520e867a220b039a03e790f2d91e02
+  output_sha256: 4fe4f1a1ecf8324c0cc06836772b9ef8579c3bc7765027f1ab3d301147708572
+  period: 2022
+  scope: France, FR-Femmes et FR-Hommes
+  official_ages:
+  - 0
+  - 100
+  conversion: Quotients pour100000 divisés par100000
+  tail: Quotients logistiques ajustés aux âges 90..100, ancrés au q100 officiel ;
+    extrapolation explicite, pas table officielle.
+  parameters:
+    F:
+      method: logistic_qx_kannisto
+      fit_ages:
+      - 90
+      - 100
+      beta: 0.14568982532805078
+      anchor_age: 100
+      anchor_logit_qx: -0.6914076845750331
+      terminal_age: 120
+    M:
+      method: logistic_qx_kannisto
+      fit_ages:
+      - 90
+      - 100
+      beta: 0.13324971240291883
+      anchor_age: 100
+      anchor_logit_qx: -0.4171037692768344
+      terminal_age: 120
+  csv_rows: 242

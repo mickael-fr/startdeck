@@ -23,7 +23,7 @@ FISCAL_PARAMS = yaml.safe_load((SKILL_ROOT/'config/parametres_fiscaux.yaml').rea
 FISCAL_YEAR = FISCAL_PARAMS['millésime']
 SOURCES = [{'label': key.replace('_', ' ').capitalize(), 'url': url}
            for key, url in FISCAL_PARAMS['sources'].items()]
-DEFAULTS = {'mode': 'viager', 'name': 'Démonstration fictive - à remplacer', 'source_url': '', 'notes': 'Démonstration entièrement fictive. Tous les montants sont des hypothèses à remplacer. Aucun revenu personnel supposé.', 'type': 'occupe', 'usage': 'habitation', 'bouquet': 50000, 'occupied_value': 140000, 'property_value': 240000, 'monthly_annuity': 700, 'rent_monthly': 950, 'notary_basis': 'occupied', 'notary_rate': 0.08, 'notary_amount': None, 'other_fees': 0, 'annuity_growth': 0.02, 'departure_increase': 0, 'libre_after': None, 'death_after': 15, 'years': 30, 'property_growth': 0, 'rent_growth': 0.01, 'charges_growth': 0.02, 'discount_rate': 0.04, 'property_tax': 1200, 'other_charges': 600, 'annual_works': 1000, 'insurance': 180, 'management_rate': 0.06, 'vacancy_rate': 0.05, 'renovation': 10000, 'regime': 'micro-foncier', 'tax_method': 'tmi', 'taxable_income': None, 'tmi': 0.11, 'parts': 1, 'parts_base': 1, 'quotient_cap': None, 'situation': 'celibataire', 'other_rent': 0, 'other_rent_charges': 0, 'ifi_assets': 0, 'amortization': 0, 'heads': [], 'mortality_table': 'insee', 'mortality_adjustment': 1, 'mc_enabled': False, 'reversal': 1, 'loan_amount': 0, 'loan_years': 20, 'loan_rate': 0.04, 'loan_insurance_rate': 0, 'loan_payment_override': None, 'loan_exit_fee': 0, 'share_investment': 50000, 'project_cost': 200000, 'exit_project_value': 240000, 'holding_years': 4, 'annual_yield': 0.085, 'downpayment': 50000, 'released_other_charges': None}
+DEFAULTS = {'mode': 'viager', 'name': 'Démonstration fictive - à remplacer', 'source_url': '', 'notes': 'Démonstration entièrement fictive. Tous les montants sont des hypothèses à remplacer. Aucun revenu personnel supposé.', 'type': 'occupe', 'usage': 'habitation', 'bouquet': 50000, 'occupied_value': 140000, 'property_value': 240000, 'monthly_annuity': 700, 'rent_monthly': 950, 'notary_basis': 'occupied', 'notary_rate': 0.08, 'notary_amount': None, 'other_fees': 0, 'annuity_growth': 0.02, 'departure_increase': 0, 'libre_after': None, 'death_after': 15, 'years': 30, 'property_growth': 0, 'rent_growth': 0.01, 'charges_growth': 0.02, 'discount_rate': 0.04, 'property_tax': 1200, 'other_charges': 600, 'annual_works': 1000, 'insurance': 180, 'management_rate': 0.06, 'vacancy_rate': 0.05, 'renovation': 10000, 'regime': 'micro-foncier', 'tax_method': 'tmi', 'taxable_income': None, 'tmi': 0.11, 'parts': 1, 'parts_base': 1, 'quotient_cap': None, 'situation': 'celibataire', 'other_rent': 0, 'other_rent_charges': 0, 'ifi_assets': 0, 'amortization': 0, 'heads': [], 'mortality_table': 'insee', 'mortality_adjustment': 1, 'mc_enabled': False, 'reversal': 1, 'loan_amount': 0, 'loan_years': 20, 'loan_rate': 0.04, 'loan_insurance_rate': 0, 'loan_payment_override': None, 'loan_exit_fee': 0, 'share_investment': 50000, 'project_cost': 200000, 'exit_project_value': 240000, 'holding_years': 4, 'annual_yield': 0.085, 'downpayment': 50000, 'contract_kind': 'viager', 'payment_term_years': None, 'released_other_charges': None}
 
 
 def _number(value, key, low=0., high=1e9, nullable=False):
@@ -45,7 +45,7 @@ def validate(data):
         raise ValueError('Une saisie JSON objet est requise.')
     d = deepcopy(DEFAULTS)
     d.update({key: value for key, value in data.items() if key in d})
-    choices = dict(mode=('viager', 'portage'), type=('occupe', 'libre'),
+    choices = dict(mode=('viager', 'portage'), type=('occupe', 'libre'), contract_kind=('viager','vente-terme'),
         usage=('habitation', 'professionnel'), notary_basis=('occupied', 'full', 'custom'),
         regime=('micro-foncier', 'reel', 'lmnp-micro', 'lmnp-reel'), tax_method=('income', 'tmi'),
         situation=('celibataire', 'couple'), mortality_table=('insee', 'tgh05'))
@@ -59,7 +59,7 @@ def validate(data):
     rates = ('notary_rate', 'departure_increase', 'management_rate', 'vacancy_rate', 'tmi',
              'reversal', 'loan_rate', 'loan_insurance_rate', 'annual_yield')
     growth = ('annuity_growth', 'property_growth', 'rent_growth', 'charges_growth', 'discount_rate')
-    nullable = ('notary_amount', 'libre_after', 'taxable_income', 'quotient_cap',
+    nullable = ('notary_amount', 'libre_after', 'taxable_income', 'quotient_cap', 'payment_term_years',
                 'loan_payment_override', 'exit_project_value', 'downpayment', 'released_other_charges')
     skip = set(choices) | set(text_keys) | {'heads', 'mc_enabled'}
     for key in set(d) - skip:
@@ -87,6 +87,12 @@ def validate(data):
         raise ValueError('mc_enabled : booléen requis.')
     if not isinstance(d['heads'], list) or len(d['heads']) > 2:
         raise ValueError('Zéro, une ou deux têtes requises.')
+    if d['contract_kind']=='vente-terme':
+        if d['payment_term_years'] is None or not 1/12 <= d['payment_term_years'] <= 60:
+            raise ValueError('Vente à terme : durée contractuelle de paiement entre un mois et 60 ans requise.')
+        if d['type']=='occupe' and d['libre_after'] is None:
+            raise ValueError('Vente à terme occupée : durée d’occupation contractuelle requise.')
+        d['heads']=[];d['mc_enabled']=False
     heads = []
     for head in d['heads']:
         if not isinstance(head, dict) or head.get('sex') not in ('F', 'M'):
@@ -153,12 +159,17 @@ def _viager_path(d, death=None, first=None, warnings=None, compute_irr=True):
     year_index = np.arange(months)//12
     departure = d['libre_after'] if d['libre_after'] is not None and d['type']=='occupe' else math.inf
     release = 0. if d['type']=='libre' else min(death, departure)
+    if d['contract_kind']=='vente-terme':
+        death=first=d['payment_term_years']
+        release=0. if d['type']=='libre' else d['libre_after']
     # Integrate fractional months exactly. A death at 1.5 years pays 18 months.
     alive = np.clip((death-start)*12, 0, 1)
     before_first = np.clip((first-start)*12, 0, 1)
     factor = before_first + d['reversal']*(alive-before_first)
+    if d['contract_kind']=='vente-terme':factor=alive
     rented = 1-np.clip((release-start)*12, 0, 1)
     departure_alive = np.maximum(0, alive-np.clip((departure-start)*12, 0, 1)) if departure < death else np.zeros(months)
+    if d['contract_kind']=='vente-terme':departure_alive=np.zeros(months)
     annuity = d['monthly_annuity']*(1+d['annuity_growth'])**year_index
     annuity = annuity*(factor+d['departure_increase']*departure_alive*
                        np.where(alive>0, factor/np.maximum(alive, 1e-10), 0))
@@ -227,10 +238,13 @@ def _viager(d, warnings):
             loan=float(p['loan'][span].sum()), net_flow=net, cumulative_cost=cumulative,
             property_value=value, nominal_margin=value-cumulative-p['balances'][year*12-1] if year<d['years'] else value-cumulative,
             loan_remaining=float(p['balances'][year*12-1])))
-    stabilization = _viager_path(dict(d, type='libre', years=1, death_after=0, loan_amount=0,
+    stabilization = _viager_path(dict(d, type='libre', contract_kind='viager', payment_term_years=None, years=1, death_after=0, loan_amount=0,
         renovation=0, annual_works=d['annual_works']), compute_irr=False)
     hypothetical = d['bouquet']+p['fees']+d['other_fees']+np.cumsum(d['monthly_annuity']*(1+d['annuity_growth'])**(np.arange(d['years']*12)//12))
     crossing = np.flatnonzero(hypothetical >= d['property_value'])
+    if d['contract_kind']=='vente-terme':
+        hypothetical=d['bouquet']+p['fees']+d['other_fees']+np.cumsum(p['annuity'])
+        crossing=np.flatnonzero(hypothetical>=d['property_value'])
     summary = dict(initial_cash=p['initial'], notary_fees=p['fees'],
         year1_monthly_effort=-annual[0]['net_flow']/12, total_annuity=float(p['annuity'].sum()),
         total_rent=float(p['rent'].sum()), total_tax=float(p['taxes'].sum()), total_net_cost=total,
@@ -239,7 +253,7 @@ def _viager(d, warnings):
         average_monthly_effort=float(-p['operating'].sum()/(d['years']*12)),
         net_yield_after_release=float(stabilization['operating'].sum()/d['property_value']),
         loan_remaining=float(p['balances'][-1]))
-    if d['death_after'] > d['years'] and d['monthly_annuity'] > 0:
+    if (d['payment_term_years'] if d['contract_kind']=='vente-terme' else d['death_after']) > d['years'] and d['monthly_annuity'] > 0:
         warnings.add('Rente encore active à la cession projetée : valeur de cession avec charge de rente inconnue ; TRI et VAN non validés (null).')
     return summary, annual
 
@@ -291,10 +305,11 @@ def _portage(d, warnings):
     return summary, annual
 
 
-def _scenario(d, name, death):
-    changed = dict(d, death_after=float(death))
+def _scenario(d, name, death, overrides=None):
+    changed = dict(d, death_after=float(death), **(overrides or {}))
     summary, _ = _viager(changed, set())
     release = 0 if d['type']=='libre' else min(float(death), d['libre_after'] if d['libre_after'] is not None else math.inf)
+    if d['contract_kind']=='vente-terme':release=0 if d['type']=='libre' else d['libre_after']
     return dict(name=name, death_after=float(death), libre_after=release,
         irr=summary['irr'], npv=summary['npv'], total_net_cost=summary['total_net_cost'],
         nominal_margin=summary['nominal_margin'], monthly_effort=summary['average_monthly_effort'])
@@ -392,6 +407,13 @@ def calculate(data):
         if longevity:
             points.append(('Longévité P90', longevity['p90']))
         scenarios = [_scenario(d, name, death) for name,death in points]
+        if d['contract_kind']=='vente-terme':
+            longevity=mc=None
+            duration=d['payment_term_years']
+            scenarios=[_scenario(d,'Central · durée contractuelle',duration),
+                _scenario(d,'Défavorable · indexation et loyers',duration,
+                    {'annuity_growth':min(1,d['annuity_growth']+0.01),'rent_monthly':d['rent_monthly']*0.8,'property_growth':min(d['property_growth'],0)})]
+            assumptions.append('Vente à terme : mensualités dues pendant la durée contractuelle, indépendamment du décès ; aucune longévité du vendeur utilisée. Scénario défavorable : indexation +1 point et loyers -20 %, valeur sans hausse.')
         assumptions.extend(['Bouquet et rente constituent un prix d’acquisition, jamais une charge fiscale déductible.',
             'Charges payées chaque mois ; déduction au réel uniquement pendant les périodes louées, dépenses éligibles saisies supposées justifiées.',
             'Libération = premier événement entre décès du dernier survivant et départ saisi ; majoration seulement après départ et avant extinction.',
@@ -404,6 +426,8 @@ def calculate(data):
             'Coût net final inclut le remboursement du capital restant et les frais de sortie, avant impôt/frais de cession.'])
         if d['notary_amount'] is None:
             warnings.add('Frais notariés estimés par taux et base saisis ; prix/base de l’acte et devis notarial à confirmer.')
+    if d['contract_kind']=='vente-terme':
+        assumptions=[a for a in assumptions if not a.startswith(('Libération =','Deux têtes :','Scénarios à durée fixe','Statistiques de longévité'))]
     return dict(mode=d['mode'], name=d['name'], inputs=d, summary=summary,
         annual_flows=annual, scenarios=scenarios, longevity=longevity, mc=mc,
         warnings=sorted(warnings), assumptions=assumptions, sources=deepcopy(SOURCES),

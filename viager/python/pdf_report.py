@@ -279,6 +279,8 @@ def build_pdf(result: dict) -> bytes:
     story.append(p("Viager Studio", "title"))
     story.append(p(result.get("name") or inputs.get("name") or "Simulation immobilière", "subtitle"))
     kind = "Portage immobilier - rendement brut" if portage else "Viager " + {"occupe": "occupé", "libre": "libre"}.get(inputs.get("type"), "- type à confirmer")
+    if inputs.get('contract_kind')=='vente-terme':
+        kind='Vente à terme '+('libre' if inputs.get('type')=='libre' else 'occupée')+' - '+_fmt(inputs.get('payment_term_years'))+' ans de paiement'
     story.append(p(f"{kind} | Établi le {_date(result.get('generated_at'))}", "small"))
     story.append(p(f"Référentiel fiscal : {result.get('fiscal_year') or 'À confirmer'}. Montants en euros. Résultat fondé sur les données et hypothèses renseignées.", "small"))
     story.append(Spacer(1, 9))
@@ -361,7 +363,7 @@ def build_pdf(result: dict) -> bytes:
                 ])
                 story.append(p("Ces repères proviennent d'une table statistique et des paramètres saisis. Ils ne constituent pas une estimation médicale individuelle.", "small"))
             else:
-                story.append(p("Non calculée : renseigner âge et sexe.", "small"))
+                story.append(p("Non applicable : vente à terme, versements indépendants du décès." if inputs.get('contract_kind')=='vente-terme' else "Non calculée : renseigner âge et sexe.", "small"))
             section("Simulation Monte Carlo")
             if mc:
                 pairs([

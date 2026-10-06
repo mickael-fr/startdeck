@@ -1,0 +1,54 @@
+millésime: 2026
+annee_revenus: 2025
+verification: '2026-10-06'
+projection: 'Règles constantes du millésime, fiscalité future non validée'
+rente_deductible: false
+dpe_interdiction_metropole: {G: 2025, F: 2028, E: 2034}
+ir:
+  tranches: [[0, 0], [11600, 0.11], [29579, 0.30], [84577, 0.41], [181917, 0.45]]
+  plafond_demi_part: 1807
+  plafond_quart_part: 904
+  decote_taux: 0.4525
+  decote_individuelle: 897
+  decote_commune: 1483
+foncier:
+  micro_seuil: 15000
+  micro_abattement: 0.30
+  ps: 0.172
+  deficit_global_plafond: 10700
+  report_ans: 10
+lmnp:
+  micro_seuil: 77700
+  micro_abattement: 0.50
+  micro_minimum: 305
+  ps: 0.186
+  report_ans: 10
+  type_location: 'longue durée uniquement'
+plus_value:
+  ir: 0.19
+  ps: 0.172
+  abattement_ir: [[6, 21, 0.06], [22, 22, 0.04]]
+  abattement_ps: [[6, 21, 0.0165], [22, 22, 0.016], [23, 30, 0.09]]
+  surtaxe_seuil: 50000
+  # plafond, taux sur PV, terme de lissage (plafond-PV)*coefficient
+  surtaxe: [[60000, 0.02, 0.05], [100000, 0.02, 0], [110000, 0.03, 0.10], [150000, 0.03, 0], [160000, 0.04, 0.15], [200000, 0.04, 0], [210000, 0.05, 0.20], [250000, 0.05, 0], [260000, 0.06, 0.25], [null, 0.06, 0]]
+ifi:
+  seuil: 1300000
+  tranches: [[0, 0], [800000, 0.005], [1300000, 0.007], [2570000, 0.01], [5000000, 0.0125], [10000000, 0.015]]
+  decote_limite: 1400000
+  decote_constante: 17500
+  decote_taux: 0.0125
+sources:
+  dpe: 'https://www.service-public.gouv.fr/particuliers/vosdroits/F35978/0_0_0'
+  ir: 'https://www.service-public.gouv.fr/particuliers/vosdroits/F1419'
+  quotient: 'https://www.economie.gouv.fr/particuliers/impots-et-fiscalite/gerer-mon-impot-sur-le-revenu/comment-calculer-votre-impot-dapres-le-bareme-de-limpot-sur-le-revenu'
+  decote: 'https://www.economie.gouv.fr/particuliers/impots-et-fiscalite/gerer-mon-impot-sur-le-revenu/pouvez-vous-beneficier-de-la-decote-de-limpot-sur-le-revenu'
+  foncier: 'https://bofip.impots.gouv.fr/bofip/3973-PGP.html/identifiant=BOI-RFPI-DECLA-10-20250306'
+  deficits: 'https://bofip.impots.gouv.fr/bofip/4142-PGP.html/identifiant=BOI-RFPI-BASE-30-20-20250916'
+  lmnp: 'https://www.impots.gouv.fr/particulier/les-regimes-dimposition'
+  ps: 'https://www.impots.gouv.fr/particulier/questions/je-donne-un-bien-en-location-dois-je-payer-des-prelevements-sociaux'
+  plus_value: 'https://www.impots.gouv.fr/particulier/plus-values-imposees'
+  surtaxe: 'https://www.impots.gouv.fr/particulier/taxes-annexes'
+  amortissement_cession: 'https://www.impots.gouv.fr/particulier/questions/je-vends-un-bien-immobilier-donne-en-location-meublee-comment-se-calcule-la'
+  ifi: 'https://www.impots.gouv.fr/particulier/calcul-de-lifi'
+  duh: 'https://bofip.impots.gouv.fr/bofip/11310-PGP.html/identifiant=BOI-PAT-IFI-20-20-30-10-20180608'

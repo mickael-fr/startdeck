@@ -12,12 +12,14 @@
   const groups = [
     ['Offre', false, [
       ['name', 'Nom de l’étude', 'text', {full: true}],
+      ['contract_kind','Nature du contrat','select',{values:[['viager','Viager'],['vente-terme','Vente à terme']],mode:'viager'}],
+      ['payment_term_years','Durée contractuelle des versements (années)','number',{min:0.0833333,max:60,nullable:true,mode:'viager',hint:'Vente à terme uniquement : durée fixe indépendante du décès.'}],
       ['type', 'Type de viager', 'select', {values: [['occupe','Occupé'],['libre','Libre']], mode: 'viager'}],
       ['usage', 'Usage du bien', 'select', {values: [['habitation','Habitation'],['professionnel','Professionnel']], mode: 'viager'}],
       ['property_value', 'Valeur libre du bien (€)', 'number', {min: 0, mode: 'viager'}],
       ['occupied_value', 'Valeur occupée (€)', 'number', {min: 0, mode: 'viager'}],
       ['bouquet', 'Bouquet (€)', 'number', {min: 0, mode: 'viager'}],
-      ['monthly_annuity', 'Rente mensuelle (€)', 'number', {min: 0, mode: 'viager'}],
+      ['monthly_annuity', 'Rente / mensualité (€)', 'number', {min: 0, mode: 'viager'}],
       ['share_investment', 'Votre investissement (€)', 'number', {min: 0, mode: 'portage'}],
       ['project_cost', 'Coût total du projet (€)', 'number', {min: 0, mode: 'portage'}],
       ['exit_project_value', 'Valeur totale à la sortie (€)', 'number', {min: 0, nullable: true, mode: 'portage', hint: 'Laisser vide si la valeur de sortie est inconnue.'}],
@@ -167,6 +169,15 @@
       else node.hidden = node.dataset.mode !== mode;
     });
     if (invalidate) dirty();
+    contractVisibility();
+  }
+  function contractVisibility(){
+    const term=$('input-contract_kind')?.value==='vente-terme';
+    for(const name of ['death_after','departure_increase','reversal','mc_enabled','mortality_table','mortality_adjustment']){
+      const input=$('input-'+name);if(input)input.closest('.field').hidden=term||mode!=='viager';
+    }
+    $('input-payment_term_years').closest('.field').hidden=!term||mode!=='viager';
+    $('add-head').hidden=term; $('head-rows').hidden=term;
   }
   function fill(data, message) {
     const values = {...bootstrap.defaults, ...data};
@@ -218,6 +229,7 @@
     renderTable($('scenarios'),['Scénario','Décès (ans)','Libération (ans)','Effort / mois','Coût net','Marge','TRI','VAN'],scenarios.map(row => ({adverse:/défavor|advers|long|stress/i.test(row.name || ''),values:[row.name,fmt(row.death_after,'number'),fmt(row.libre_after,'number'),fmt(row.monthly_effort),fmt(row.total_net_cost),fmt(row.nominal_margin),fmt(row.irr,'percent'),fmt(row.npv)]})),scenarios.length ? 'Projection selon les hypothèses de scénario' : 'Aucun scénario disponible');
     $('longevity').replaceChildren();
     if (result.mode === 'portage') $('longevity').append(el('p','La démographie ne s’applique pas à cette simulation de portage.'));
+    else if (result.inputs.contract_kind==='vente-terme') $('longevity').append(el('p',`Vente à terme : ${fmt(result.inputs.payment_term_years,'number')} ans de versements contractuels indépendants du décès. La longévité du vendeur n’intervient pas dans ce calcul.`));
     else if (!result.longevity) $('longevity').append(el('p','Démographie à confirmer : aucun résultat de longévité sans âges connus. Les durées de décès et de libération saisies restent des hypothèses.'));
     else {
       const list=el('div',null,'metric-list');
@@ -283,13 +295,13 @@
     clearResults(); $('listing-provenance').hidden=true; busy=true; disableCalculation(true);
     status('Recherche de la fiche et calcul des scénarios…');
     try {
-      const listing=await request('/api/listing',{url});
+      const listing=await request('/api/listing',{url,profile:collect()});
       if(revision !== atRevision){status('Lien modifié pendant le calcul. Cliquez à nouveau sur Analyser.');return;}
       fill(listing.result.inputs);
       $('listing-url').value=listing.result.inputs.source_url;
       $('listing-provenance').textContent=listing.provenance; $('listing-provenance').hidden=false;
       render(listing.result);calculatedRevision=revision;$('pdf').disabled=false;
-      status('Analyse calculée à partir de la fiche déjà étudiée. Rapport PDF disponible.','success');
+      status('Annonce importée. Analyse et scénario défavorable calculés ; hypothèses signalées dans le rapport.','success');
     }catch(error){clearResults();status(error.message,'error');}
     finally{busy=false;disableCalculation(false);}
   }
@@ -310,6 +322,7 @@
     $('listing-url').addEventListener('input',()=>{dirty();clearResults();$('listing-provenance').hidden=true;status('Lien modifié : cliquez sur Analyser pour préparer le rapport.');});
     document.querySelectorAll('button[data-mode]').forEach(button=>button.addEventListener('click',()=>changeMode(button.dataset.mode)));
     $('pdf').addEventListener('click',pdf);
+    $('input-contract_kind').addEventListener('change',contractVisibility);
     $('show-glossary').addEventListener('click',()=>{$('glossary-panel').open=true;$('glossary-panel').scrollIntoView({behavior:'auto',block:'start'});});
     $('save').addEventListener('click',()=>{try{localStorage.setItem(STORAGE,JSON.stringify(collect()));status('Saisie enregistrée uniquement sur ce navigateur.','success');}catch{status('Le navigateur refuse l’enregistrement local. Vous pouvez exporter la saisie.','error');}});
     $('export').addEventListener('click',()=>{const data=collect();download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),`${safeName(data.name)}-saisie.json`);status('Saisie exportée en fichier JSON local.');});

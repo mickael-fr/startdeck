@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>StartDeck</title>
-<meta name="startdeck-build" content="2026-10-02.1">
+<meta name="startdeck-build" content="2026-10-06.viager1">
 <meta name="theme-color" content="#0d1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1264,6 +1264,26 @@ window.addEventListener('online',()=>checkUpdate());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
 setInterval(checkUpdate,60000);
 
+/* ---------- Personal app shortcut (one-time, after initial sync) ---------- */
+function addViagerShortcut(state){
+  const url='https://mickael-fr.github.io/startdeck/viager/';
+  let personal=state.tabs.find(t=>t.name.trim().toLowerCase()==='perso');
+  if(!personal){personal={id:uid(),name:'Perso',cards:[]};state.tabs.push(personal)}
+  if(personal.cards.some(c=>c.type==='links'&&c.items.some(i=>i.u.replace(/\/$/,'')===url.replace(/\/$/,''))))return false;
+  let links=personal.cards.find(c=>c.type==='links'&&c.title==='Investissements');
+  if(!links){links={id:uid(),type:'links',title:'Investissements',items:[]};personal.cards.push(links)}
+  links.items.push({t:'Viager Studio',u:url});return true;
+}
+function installViagerShortcut(){
+  if(storageFailed||remoteConflict)return;
+  try{
+    if(localStorage.getItem('startdeck.viager-shortcut.v1'))return;
+    backup();
+    if(addViagerShortcut(S))save();
+    if(!storageFailed){localStorage.setItem('startdeck.viager-shortcut.v1','installed');render()}
+  }catch(e){setSaveStatus('Raccourci Viager Studio : sauvegarde impossible.',true)}
+}
+
 /* ---------- go ---------- */
 applyTheme();
 render();
@@ -1274,7 +1294,7 @@ if(!storageFailed){
   try{if(!localStorage.getItem(BACKUP_KEY)&&localStorage.getItem(KEY))backup()}catch{}
   persist();
   setSaveStatus(session?'Connexion à la synchronisation…':'Enregistré sur cet appareil · synchronisation non activée');
-  syncNow();
+  syncNow().then(installViagerShortcut);
 }
 </script>
 </body>

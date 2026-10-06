@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Viager Studio · Simulation immobilière</title>
-  <link rel="stylesheet" href="./static/style.css">
+  <link rel="stylesheet" href="./static/style.css?v=20261006-rent1">
   <script src="./browser-api.js?v=20261006-url2" defer></script>
-  <script src="./static/app.js?v=20261006-url2" defer></script>
+  <script src="./static/app.js?v=20261006-rent1" defer></script>
 </head>
 <body>
   <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">V</span><div><strong>Viager Studio</strong><span>Simulation immobilière</span></div></div><span class="local-badge">Calcul sur votre appareil</span></header>
@@ -26,6 +26,13 @@
           <button type="button" id="import-top">Charger une fiche personnelle</button>
           <p id="listing-provenance" class="muted" hidden></p>
         </form>
+        <section id="rental-entry" class="rental-entry" aria-labelledby="rental-title" hidden>
+          <h3 id="rental-title">Location dès l’achat</h3>
+          <p>Ce bien est libre. Indiquez le loyer de marché hors charges que vous souhaitez retenir.</p>
+          <div id="rental-field"></div>
+          <p class="muted">Le calcul déduit la vacance, la gestion, les charges et les impôts selon vos paramètres. Le loyer saisi reste une hypothèse à vérifier.</p>
+          <button class="primary" id="calculate-rent" type="submit" form="simulation-form">Calculer avec ce loyer →</button>
+        </section>
         <details id="advanced" class="advanced-inputs"><summary>Affiner l’analyse · facultatif</summary>
         <div class="mode-tabs" role="group" aria-label="Type de simulation"><button type="button" data-mode="viager" aria-pressed="true">Viager</button><button type="button" data-mode="portage" aria-pressed="false">Portage</button></div>
         <div id="examples" class="example-bar" aria-label="Charger un exemple"></div>

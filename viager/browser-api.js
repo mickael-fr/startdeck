@@ -28,22 +28,14 @@
     async request(path,data,binary){
       if(path==='/api/listing'){
         const url=canonical(data.url);
-        let imported;
-        try{
-          const response=await fetch('http://127.0.0.1:8768/api/import-listing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url}),signal:AbortSignal.timeout(45000)});
-          imported=await response.json();
-          if(!response.ok)throw new Error(imported.error||'Lecture de l’annonce impossible.');
-        }catch(error){
-          if(error instanceof TypeError || error.name==='TimeoutError'){
-            const saved=importedCases.get(url);
-            if(saved)return {result:await run('calculate',saved),live:false,provenance:'Service local indisponible ; fiche personnelle déjà importée, annonce non relue.'};
-            throw new Error('Le service de lecture sur ce PC est inaccessible. Lancez « Ouvrir Viager Studio » sur le PC, puis réessayez. Si le navigateur demande l’accès au réseau local, cet accès est nécessaire pour joindre votre propre service.');
-          }
-          throw error;
-        }
-        const inputs=imported.inputs;
-        for(const key of ['tax_method','taxable_income','tmi','parts','parts_base','quotient_cap','situation','other_rent','other_rent_charges','ifi_assets','amortization'])if(data.profile&&key in data.profile)inputs[key]=data.profile[key];
-        return {result:await run('calculate',inputs),live:imported.live,provenance:imported.provenance};
+        const target=new URL('http://127.0.0.1:8768/');target.searchParams.set('annonce',url);
+        const profile={};
+        for(const key of ['tax_method','taxable_income','tmi','parts','parts_base','quotient_cap','situation','other_rent','other_rent_charges','ifi_assets','amortization'])if(data.profile&&key in data.profile)profile[key]=data.profile[key];
+        // Fragment is never transmitted to an HTTP server; local UI clears it.
+        target.hash='profil='+encodeURIComponent(JSON.stringify(profile));
+        document.getElementById('status').textContent='Ouverture de l’analyse sur ce PC…';
+        location.assign(target.href);
+        return new Promise(()=>{}); // Page navigation replaces this pending UI.
       }
       const result=await run(path==='/api/pdf'?'pdf':'calculate',data);
       return binary?new Blob([result],{type:'application/pdf'}):result;

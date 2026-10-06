@@ -6,9 +6,9 @@ async function initialize(){
   progress('Premier calcul : chargement du moteur dans votre navigateur…');
   const py=await loadPyodide();
   await py.loadPackage(['numpy','pandas','pyyaml','tzdata']);
-  const manifest=await (await fetch('./python-files.json')).json();
+  const manifest=await (await fetch('./python-files.json?v=20261006-url1',{cache:'no-store'})).json();
   for(const file of manifest){
-    const response=await fetch('./python/'+file);if(!response.ok)throw new Error('Fichier du moteur indisponible : '+file);
+    const response=await fetch('./python/'+file+'?v=20261006-url1',{cache:'no-store'});if(!response.ok)throw new Error('Fichier du moteur indisponible : '+file);
     const target='/app/'+file, folder=target.slice(0,target.lastIndexOf('/'));py.FS.mkdirTree(folder);
     py.FS.writeFile(target,new Uint8Array(await response.arrayBuffer()));
   }

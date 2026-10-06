@@ -60,6 +60,8 @@
     "holding_years": 4,
     "annual_yield": 0.085,
     "downpayment": 50000,
+    "contract_kind": "viager",
+    "payment_term_years": null,
     "released_other_charges": null
   },
   "examples": [
@@ -127,6 +129,8 @@
         "holding_years": 4,
         "annual_yield": 0.085,
         "downpayment": 50000,
+        "contract_kind": "viager",
+        "payment_term_years": null,
         "released_other_charges": null
       }
     }

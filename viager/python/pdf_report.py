@@ -338,7 +338,7 @@ def build_pdf(result: dict) -> bytes:
     longevity, mc = result.get("longevity"), result.get("mc")
     if scenarios or not portage:
         new_page("Sensibilités et incertitude")
-        story.append(p("Les scénarios font varier les hypothèses de durée. Les résultats restent des projections ; aucune probabilité de gain n'est déduite des seuls montants saisis."))
+        story.append(p("Vente à terme : durée contractuelle fixe ; le scénario défavorable augmente l'indexation d'un point et diminue les loyers de 20 %. Les résultats restent des projections." if inputs.get('contract_kind')=='vente-terme' else "Les scénarios font varier les hypothèses de durée. Les résultats restent des projections ; aucune probabilité de gain n'est déduite des seuls montants saisis."))
         if scenarios:
             section("Scénarios comparés")
             story.append(p("Durées en années ; VAN, coût net cumulé, marge nominale et effort mensuel en euros. La marge est théorique avant les frais et impôts de cession non inclus.", "small"))

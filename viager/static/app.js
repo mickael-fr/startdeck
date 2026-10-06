@@ -226,7 +226,7 @@
     const scenarios=result.scenarios || [];
     $('scenarios-section').hidden=scenarios.length === 0;
     $('longevity-section').hidden=result.mode === 'portage';
-    renderTable($('scenarios'),['Scénario','Décès (ans)','Libération (ans)','Effort / mois','Coût net','Marge','TRI','VAN'],scenarios.map(row => ({adverse:/défavor|advers|long|stress/i.test(row.name || ''),values:[row.name,fmt(row.death_after,'number'),fmt(row.libre_after,'number'),fmt(row.monthly_effort),fmt(row.total_net_cost),fmt(row.nominal_margin),fmt(row.irr,'percent'),fmt(row.npv)]})),scenarios.length ? 'Projection selon les hypothèses de scénario' : 'Aucun scénario disponible');
+    renderTable($('scenarios'),['Scénario',result.inputs.contract_kind==='vente-terme'?'Versements (ans)':'Décès (ans)','Libération (ans)','Effort / mois','Coût net','Marge','TRI','VAN'],scenarios.map(row => ({adverse:/défavor|advers|long|stress/i.test(row.name || ''),values:[row.name,fmt(row.death_after,'number'),fmt(row.libre_after,'number'),fmt(row.monthly_effort),fmt(row.total_net_cost),fmt(row.nominal_margin),fmt(row.irr,'percent'),fmt(row.npv)]})),scenarios.length ? 'Projection selon les hypothèses de scénario' : 'Aucun scénario disponible');
     $('longevity').replaceChildren();
     if (result.mode === 'portage') $('longevity').append(el('p','La démographie ne s’applique pas à cette simulation de portage.'));
     else if (result.inputs.contract_kind==='vente-terme') $('longevity').append(el('p',`Vente à terme : ${fmt(result.inputs.payment_term_years,'number')} ans de versements contractuels indépendants du décès. La longévité du vendeur n’intervient pas dans ce calcul.`));
@@ -339,6 +339,19 @@
       let saved;try{const raw=localStorage.getItem(STORAGE);if(raw)saved=JSON.parse(raw);}catch{}
       fill(saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : bootstrap.defaults,'Collez l’URL d’une annonce pour commencer. Les réglages restent accessibles dans « Affiner l’analyse ».');
       if(saved && window.ViagerBackend)window.ViagerBackend.register(saved);
+      if(!window.ViagerBackend){
+        const incoming=new URLSearchParams(location.search).get('annonce');
+        const encoded=new URLSearchParams(location.hash.slice(1)).get('profil');
+        if(encoded){
+          history.replaceState(null,'',location.pathname+location.search);
+          try{
+            const profile=JSON.parse(encoded),values=collect();
+            for(const key of ['tax_method','taxable_income','tmi','parts','parts_base','quotient_cap','situation','other_rent','other_rent_charges','ifi_assets','amortization'])if(profile&&key in profile)values[key]=profile[key];
+            fill(values);
+          }catch{status('Profil transmis invalide : paramètres locaux conservés.');}
+        }
+        if(incoming){$('listing-url').value=incoming;await analyseURL({preventDefault(){}});}
+      }
     } catch(error){status(error.message,'error');disableCalculation(true);$('save').disabled=true;$('export').disabled=true;$('import').disabled=true;}
   }
   init();

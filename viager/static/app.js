@@ -8,6 +8,7 @@
   let bootstrap, mode = 'viager', revision = 0, calculatedRevision = -1, currentResult = null, busy = false;
   const rateFields = new Set();
   const fields = [];
+  let rentHome;
   // name, label, kind, options. All rates cross the API boundary as fractions.
   const groups = [
     ['Offre', false, [
@@ -93,7 +94,7 @@
     return node;
   }
   function status(message, kind = '') { $('status').textContent = message; $('status').className = `status ${kind}`; }
-  function disableCalculation(disabled) { $('calculate').disabled=disabled; $('analyse-url').disabled=disabled; }
+  function disableCalculation(disabled) { $('calculate').disabled=disabled; $('analyse-url').disabled=disabled; $('calculate-rent').disabled=disabled; }
   function dirty() {
     revision++; calculatedRevision = -1; $('pdf').disabled = true; clearPDF();
     if (currentResult) status('Saisie modifiée : les résultats affichés correspondent au calcul précédent. Recalculez avant le PDF.');
@@ -170,6 +171,18 @@
     });
     if (invalidate) dirty();
     contractVisibility();
+    rentalVisibility();
+  }
+  function rentalVisibility(){
+    const input=$('input-rent_monthly'),wrap=input.closest('.field');
+    const free=mode==='viager'&&$('input-type').value==='libre';
+    if(!rentHome)rentHome=wrap.parentElement;
+    $('rental-entry').hidden=!free;
+    if(free){$('rental-field').append(wrap);input.setAttribute('form','simulation-form');}
+    else {rentHome.insertBefore(wrap,rentHome.firstChild);input.removeAttribute('form');}
+    wrap.querySelector('label').textContent=free?'Loyer mensuel hors charges retenu (€)':'Loyer mensuel à la libération (€)';
+    input.required=free;input.min=free?'0.01':'0';
+    if(free&&Number(input.value)<=0)input.value='';
   }
   function contractVisibility(){
     const term=$('input-contract_kind')?.value==='vente-terme';
@@ -273,13 +286,21 @@
   }
   async function request(path,data,binary=false) {
     if(window.ViagerBackend) return window.ViagerBackend.request(path,data,binary);
-    const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    let response;
+    try {response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
+    catch {throw new Error('Le lecteur local Viager Studio ne répond pas. Relancez « Ouvrir Viager Studio.cmd », puis cliquez à nouveau sur Analyser.');}
     if(!response.ok) { let message=`Erreur ${response.status}`; try {message=(await response.json()).error || message;}catch{} throw new Error(message); }
     return binary ? response.blob() : response.json();
   }
   async function calculate(event) {
     event.preventDefault(); if(busy || !form.reportValidity())return;
-    const data=collect(), atRevision=revision; busy=true; disableCalculation(true); $('pdf').disabled=true; status('Calcul de la projection et des scénarios…');
+    const data=collect(), atRevision=revision;
+    if(data.mode==='viager'&&data.type==='libre'){
+      data.notes=data.notes.split('\n').filter(line=>!line.startsWith('Loyer hors charges inconnu :')&&!line.startsWith('Loyer annoncé ')&&!line.startsWith('Loyer de marché saisi :')).join('\n');
+      data.notes+='\nLoyer de marché saisi : '+data.rent_monthly+' €/mois hors charges, hypothèse utilisateur. Location simulée dès l’achat.';
+      $('input-notes').value=data.notes;
+    }
+    busy=true; disableCalculation(true); $('pdf').disabled=true; status('Calcul de la projection et des scénarios…');
     try {
       const result=await request('/api/calculate',data);
       if(revision !== atRevision) {status('La saisie a changé pendant le calcul. Relancez la simulation.');return;}
@@ -297,6 +318,14 @@
     try {
       const listing=await request('/api/listing',{url,profile:collect()});
       if(revision !== atRevision){status('Lien modifié pendant le calcul. Cliquez à nouveau sur Analyser.');return;}
+      if(listing.requires_rent){
+        fill(listing.inputs);
+        $('listing-url').value=listing.inputs.source_url||url;
+        $('listing-provenance').textContent=listing.provenance;$('listing-provenance').hidden=false;
+        $('result-name').textContent='Viager libre · loyer à renseigner';
+        status('Annonce importée : renseignez un loyer de marché hors charges, puis cliquez sur « Calculer avec ce loyer ». Aucun rendement locatif calculé avec un loyer inconnu.');
+        $('input-rent_monthly').focus();return;
+      }
       fill(listing.result.inputs);
       $('listing-url').value=listing.result.inputs.source_url;
       $('listing-provenance').textContent=listing.provenance; $('listing-provenance').hidden=false;
@@ -323,6 +352,8 @@
     document.querySelectorAll('button[data-mode]').forEach(button=>button.addEventListener('click',()=>changeMode(button.dataset.mode)));
     $('pdf').addEventListener('click',pdf);
     $('input-contract_kind').addEventListener('change',contractVisibility);
+    $('input-type').addEventListener('change',rentalVisibility);
+    $('input-rent_monthly').addEventListener('input',()=>{if(!$('rental-entry').hidden){dirty();clearResults();clearPDF();status('Loyer modifié : cliquez sur « Calculer avec ce loyer » pour actualiser le rapport.');}});
     $('show-glossary').addEventListener('click',()=>{$('glossary-panel').open=true;$('glossary-panel').scrollIntoView({behavior:'auto',block:'start'});});
     $('save').addEventListener('click',()=>{try{localStorage.setItem(STORAGE,JSON.stringify(collect()));status('Saisie enregistrée uniquement sur ce navigateur.','success');}catch{status('Le navigateur refuse l’enregistrement local. Vous pouvez exporter la saisie.','error');}});
     $('export').addEventListener('click',()=>{const data=collect();download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),`${safeName(data.name)}-saisie.json`);status('Saisie exportée en fichier JSON local.');});

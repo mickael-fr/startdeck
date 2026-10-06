@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Viager Studio · Simulation immobilière</title>
+  <link rel="stylesheet" href="./static/style.css">
+  <script src="./browser-api.js" defer></script>
+  <script src="./static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">V</span><div><strong>Viager Studio</strong><span>Simulation immobilière</span></div></div><span class="local-badge">Calcul sur votre appareil</span></header>
+  <main>
+    <div class="workspace-title"><div><h1>Une annonce, une analyse</h1><p>Collez le lien de votre annonce, puis consultez le rapport.</p></div></div>
+    <div id="status" class="status" role="status" aria-live="polite">Chargement des hypothèses…</div>
+    <details class="glossary-panel" id="glossary-panel"><summary>Comprendre les termes · VAN, TRI, TMI…</summary><div id="glossary" class="glossary-grid"></div></details>
+    <div class="workspace">
+      <section class="input-panel" aria-labelledby="input-title">
+        <div class="panel-heading"><h2 id="input-title">Votre annonce</h2><span id="fiscal-year" class="muted"></span></div>
+        <form id="url-form" class="url-entry">
+          <label for="listing-url">URL de l’annonce</label>
+          <input id="listing-url" type="url" placeholder="https://www.costes-viager.com/acheter/…" required autocomplete="off">
+          <button class="primary" id="analyse-url" type="submit" disabled>Analyser l’annonce →</button>
+          <p class="muted">Vos fiches restent sur cet appareil. Importez une fiche ou utilisez « Affiner l’analyse ». La lecture de nouvelles URL n’est pas encore connectée.</p>
+          <button type="button" id="import-top">Charger une fiche personnelle</button>
+          <p id="listing-provenance" class="muted" hidden></p>
+        </form>
+        <details id="advanced" class="advanced-inputs"><summary>Affiner l’analyse · facultatif</summary>
+        <div class="mode-tabs" role="group" aria-label="Type de simulation"><button type="button" data-mode="viager" aria-pressed="true">Viager</button><button type="button" data-mode="portage" aria-pressed="false">Portage</button></div>
+        <div id="examples" class="example-bar" aria-label="Charger un exemple"></div>
+        <form id="simulation-form">
+          <div id="fields"></div>
+          <div class="calculate-bar"><button class="primary" id="calculate" type="submit">Calculer la simulation <span aria-hidden="true">→</span></button><span class="muted">Les résultats dépendent de vos hypothèses.</span></div>
+        </form>
+        <div class="storage-actions"><button id="save" type="button">Enregistrer la saisie</button><button id="export" type="button">Exporter saisie</button><button id="import" type="button">Charger fichier</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+        <p class="privacy-note">Enregistrement uniquement sur ce navigateur. Les calculs et le PDF restent sur cet appareil. Aucun profil ni rapport n’est transmis à un serveur.</p>
+        </details>
+      </section>
+      <section class="output-panel" aria-labelledby="output-title">
+        <div class="panel-heading"><div><h2 id="output-title">Projection</h2><span id="result-name" class="muted">En attente de calcul</span></div><button id="pdf" type="button" disabled>Rapport PDF</button></div>
+        <div id="empty-results" class="empty-results"><span class="empty-symbol" aria-hidden="true">↗</span><h3>Votre rapport commence par un lien</h3><p>Collez une URL et cliquez sur Analyser. Les données disponibles, les hypothèses et le scénario défavorable seront présentés ensemble.</p></div>
+        <div id="results" hidden>
+          <div id="cards" class="cards"></div>
+          <div class="beginner-help"><strong>Comment lire ces chiffres ?</strong><p><b>TRI</b> : rendement annuel du scénario. <b>VAN</b> : ce que vaut aujourd’hui le projet par rapport au rendement demandé. <b>TMI</b> : tranche d’impôt utilisée si votre revenu imposable est inconnu.</p><p id="npv-reading"></p><button id="show-glossary" type="button">Voir la légende complète</button></div>
+          <div class="result-note">Projections théoriques : une marge ou un TRI ne constitue pas un gain réalisé. Effort positif = décaissement ; effort négatif = excédent.</div>
+          <div id="warnings" class="warnings"></div>
+          <section class="chart-panel"><h3>Coût cumulé et valeur projetée</h3><div id="value-chart"></div><div class="legend"><span class="legend-cost">Coût cumulé</span><span class="legend-value">Valeur du bien / projet</span></div></section>
+          <section class="chart-panel"><h3>Effort de trésorerie annuel</h3><div id="flow-chart"></div><p class="muted chart-note">Au-dessus de zéro : décaissement. En dessous : excédent de trésorerie.</p></section>
+          <section id="scenarios-section"><h3>Scénarios et sensibilité</h3><div id="scenarios" class="table-scroll"></div></section>
+          <details id="longevity-section" class="result-details" open><summary>Longévité et démographie</summary><div id="longevity"></div></details>
+          <details class="result-details"><summary>Flux annuels · tous les postes</summary><div id="annual" class="table-scroll"></div></details>
+          <details class="result-details"><summary>Hypothèses et sources</summary><div id="assumptions"></div><div id="sources"></div></details>
+          <p id="generated" class="muted"></p>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>Viager Studio · aide à l’analyse · montants en euros · fiscalité et hypothèses à vérifier avant toute décision</footer>
+</body>
+</html>

@@ -1,0 +1,246 @@
+{
+  "defaults": {
+    "mode": "viager",
+    "name": "Démonstration fictive - à remplacer",
+    "source_url": "",
+    "notes": "Démonstration entièrement fictive. Tous les montants sont des hypothèses à remplacer. Aucun revenu personnel supposé.",
+    "type": "occupe",
+    "usage": "habitation",
+    "bouquet": 50000,
+    "occupied_value": 140000,
+    "property_value": 240000,
+    "monthly_annuity": 700,
+    "rent_monthly": 950,
+    "notary_basis": "occupied",
+    "notary_rate": 0.08,
+    "notary_amount": null,
+    "other_fees": 0,
+    "annuity_growth": 0.02,
+    "departure_increase": 0,
+    "libre_after": null,
+    "death_after": 15,
+    "years": 30,
+    "property_growth": 0,
+    "rent_growth": 0.01,
+    "charges_growth": 0.02,
+    "discount_rate": 0.04,
+    "property_tax": 1200,
+    "other_charges": 600,
+    "annual_works": 1000,
+    "insurance": 180,
+    "management_rate": 0.06,
+    "vacancy_rate": 0.05,
+    "renovation": 10000,
+    "regime": "micro-foncier",
+    "tax_method": "tmi",
+    "taxable_income": null,
+    "tmi": 0.11,
+    "parts": 1,
+    "parts_base": 1,
+    "quotient_cap": null,
+    "situation": "celibataire",
+    "other_rent": 0,
+    "other_rent_charges": 0,
+    "ifi_assets": 0,
+    "amortization": 0,
+    "heads": [],
+    "mortality_table": "insee",
+    "mortality_adjustment": 1,
+    "mc_enabled": false,
+    "reversal": 1,
+    "loan_amount": 0,
+    "loan_years": 20,
+    "loan_rate": 0.04,
+    "loan_insurance_rate": 0,
+    "loan_payment_override": null,
+    "loan_exit_fee": 0,
+    "share_investment": 50000,
+    "project_cost": 200000,
+    "exit_project_value": 240000,
+    "holding_years": 4,
+    "annual_yield": 0.085,
+    "downpayment": 50000,
+    "released_other_charges": null
+  },
+  "examples": [
+    {
+      "name": "demo",
+      "label": "Démonstration fictive",
+      "data": {
+        "mode": "viager",
+        "name": "Démonstration fictive - à remplacer",
+        "source_url": "",
+        "notes": "Démonstration entièrement fictive. Tous les montants sont des hypothèses à remplacer. Aucun revenu personnel supposé.",
+        "type": "occupe",
+        "usage": "habitation",
+        "bouquet": 50000,
+        "occupied_value": 140000,
+        "property_value": 240000,
+        "monthly_annuity": 700,
+        "rent_monthly": 950,
+        "notary_basis": "occupied",
+        "notary_rate": 0.08,
+        "notary_amount": null,
+        "other_fees": 0,
+        "annuity_growth": 0.02,
+        "departure_increase": 0,
+        "libre_after": null,
+        "death_after": 15,
+        "years": 30,
+        "property_growth": 0,
+        "rent_growth": 0.01,
+        "charges_growth": 0.02,
+        "discount_rate": 0.04,
+        "property_tax": 1200,
+        "other_charges": 600,
+        "annual_works": 1000,
+        "insurance": 180,
+        "management_rate": 0.06,
+        "vacancy_rate": 0.05,
+        "renovation": 10000,
+        "regime": "micro-foncier",
+        "tax_method": "tmi",
+        "taxable_income": null,
+        "tmi": 0.11,
+        "parts": 1,
+        "parts_base": 1,
+        "quotient_cap": null,
+        "situation": "celibataire",
+        "other_rent": 0,
+        "other_rent_charges": 0,
+        "ifi_assets": 0,
+        "amortization": 0,
+        "heads": [],
+        "mortality_table": "insee",
+        "mortality_adjustment": 1,
+        "mc_enabled": false,
+        "reversal": 1,
+        "loan_amount": 0,
+        "loan_years": 20,
+        "loan_rate": 0.04,
+        "loan_insurance_rate": 0,
+        "loan_payment_override": null,
+        "loan_exit_fee": 0,
+        "share_investment": 50000,
+        "project_cost": 200000,
+        "exit_project_value": 240000,
+        "holding_years": 4,
+        "annual_yield": 0.085,
+        "downpayment": 50000,
+        "released_other_charges": null
+      }
+    }
+  ],
+  "fiscal_year": 2026,
+  "glossary": [
+    {
+      "term": "VAN",
+      "name": "Valeur actuelle nette",
+      "definition": "Compare les encaissements et les dépenses en ramenant chaque montant à sa valeur d’aujourd’hui, au taux d’actualisation choisi.",
+      "reading": "Positive : le scénario dépasse le rendement demandé. Négative : il reste en dessous. Une VAN négative n’est pas une perte de trésorerie du même montant."
+    },
+    {
+      "term": "TRI",
+      "name": "Taux de rentabilité interne",
+      "definition": "Rendement annuel calculé à partir de tous les encaissements et décaissements, en tenant compte de leur date.",
+      "reading": "Le comparer au rendement souhaité. Ici, il inclut une valeur de revente hypothétique ; ce n’est ni un taux garanti ni forcément un rendement après tous les impôts."
+    },
+    {
+      "term": "TMI",
+      "name": "Tranche marginale d’imposition",
+      "definition": "Taux de la tranche du barème qui s’applique aux derniers euros de votre revenu imposable.",
+      "reading": "Ce taux ne s’applique pas à tous vos revenus. La méthode TMI est une approximation ; le calcul avec et sans l’opération est plus précis."
+    },
+    {
+      "term": "Taux d’actualisation",
+      "name": "Rendement demandé",
+      "definition": "Taux choisi pour comparer un euro reçu plus tard à un euro disponible aujourd’hui.",
+      "reading": "Exemple : à 4 %, 104 € reçus dans un an valent 100 € aujourd’hui. Plus le taux est élevé, plus la VAN baisse."
+    },
+    {
+      "term": "Effort mensuel",
+      "name": "Trésorerie à prévoir",
+      "definition": "Dépenses moins recettes de l’année, divisées par douze : rente, charges, crédit et impôts, après loyers.",
+      "reading": "Positif : argent à ajouter. Négatif : excédent. C’est une moyenne annuelle, pas forcément la somme prélevée chaque mois."
+    },
+    {
+      "term": "Coût net cumulé",
+      "name": "Dépenses nettes depuis l’achat",
+      "definition": "Argent mobilisé au départ puis dépenses accumulées, après déduction des recettes retenues.",
+      "reading": "La valeur finale du bien reste à part. Le remboursement du crédit restant à la sortie est inclus lorsqu’il existe."
+    },
+    {
+      "term": "Marge nominale",
+      "name": "Écart théorique à l’horizon",
+      "definition": "Valeur projetée du bien moins coût net cumulé et dette restante selon le modèle.",
+      "reading": "Cette différence ne tient pas compte du temps comme la VAN. Elle ne constitue pas un gain encaissé et peut exclure les frais et impôts de vente."
+    },
+    {
+      "term": "Point mort",
+      "name": "Rente suffisamment longue pour atteindre la valeur libre",
+      "definition": "Dans cet outil : durée théorique où bouquet, frais d’acquisition et rente cumulée atteignent la valeur libre initiale.",
+      "reading": "Ce repère exclut charges et loyers et suppose que la rente continue. Il ne marque pas le début de la rentabilité réelle."
+    },
+    {
+      "term": "P10 / P90",
+      "name": "Percentiles de simulation",
+      "definition": "Seuils qui situent un résultat dans la distribution des tirages.",
+      "reading": "Longévité P90 : 90 % des durées simulées sont au plus égales à ce seuil ; certaines sont plus longues. TRI P10 : rendement parmi les plus faibles. Ces deux mesures sont différentes ; P90 n’est pas un maximum."
+    },
+    {
+      "term": "Médiane",
+      "name": "Milieu des résultats",
+      "definition": "Valeur séparant les simulations en deux moitiés : une moitié en dessous, une moitié au-dessus.",
+      "reading": "Elle peut différer de la moyenne. Aucun de ces repères ne prédit la durée de vie d’une personne."
+    },
+    {
+      "term": "Monte Carlo",
+      "name": "Nombreux scénarios simulés",
+      "definition": "Le moteur tire ici 10 000 durées selon une table de mortalité, puis calcule les flux correspondants.",
+      "reading": "Cela mesure l’incertitude du modèle. Les erreurs d’hypothèse restent possibles ; les tirages exclus du TRI sont signalés."
+    },
+    {
+      "term": "Bouquet / rente",
+      "name": "Prix payé en deux parties",
+      "definition": "Le bouquet est la somme versée au départ ; la rente est le versement périodique prévu au contrat.",
+      "reading": "Le coût final dépend de la durée, de l’indexation et des clauses. La rente payée fait partie du prix d’acquisition dans le modèle fiscal."
+    },
+    {
+      "term": "DUH",
+      "name": "Droit d’usage et d’habitation",
+      "definition": "Droit permettant au vendeur de continuer à occuper le logement selon l’acte.",
+      "reading": "En viager occupé, ce droit explique une partie de la décote. Une libération anticipée peut majorer la rente si le contrat le prévoit."
+    },
+    {
+      "term": "IR / prélèvements sociaux",
+      "name": "Impôts et contributions sur les revenus",
+      "definition": "IR signifie impôt sur le revenu. Les prélèvements sociaux sont des contributions distinctes, calculées selon le revenu et le régime applicables.",
+      "reading": "La rente payée ne se déduit pas automatiquement des loyers. Les taux et seuils viennent du millésime fiscal du modèle."
+    },
+    {
+      "term": "RFR",
+      "name": "Revenu fiscal de référence",
+      "definition": "Montant figurant sur l’avis d’impôt, utilisé notamment pour vérifier certains seuils et droits.",
+      "reading": "Il est différent du revenu net imposable. L’outil ne convertit jamais le RFR en revenu imposable."
+    },
+    {
+      "term": "LMNP / micro-BIC",
+      "name": "Location meublée et régime simplifié",
+      "definition": "LMNP signifie loueur en meublé non professionnel. Le micro-BIC calcule un revenu taxable après un abattement forfaitaire, lorsque ses conditions sont remplies.",
+      "reading": "L’éligibilité et les seuils sont à vérifier. Un local professionnel n’est pas automatiquement une location meublée d’habitation."
+    },
+    {
+      "term": "Micro-foncier / réel",
+      "name": "Régimes de location nue",
+      "definition": "Le micro-foncier utilise un abattement forfaitaire ; le réel prend en compte les dépenses fiscalement déductibles et justifiées.",
+      "reading": "Une dépense de trésorerie n’est pas forcément déductible. Le choix dépend aussi des autres loyers et des conditions d’éligibilité."
+    },
+    {
+      "term": "IFI / DPE / FAI",
+      "name": "Autres abréviations de l’annonce",
+      "definition": "IFI : impôt sur la fortune immobilière. DPE : diagnostic de performance énergétique. FAI : frais d’agence inclus dans le prix annoncé.",
+      "reading": "FAI ne signifie pas frais de notaire inclus. Le DPE et les droits d’occupation doivent être examinés avant de retenir une location ou une valeur fiscale."
+    }
+  ],
+  "sources": []
+}

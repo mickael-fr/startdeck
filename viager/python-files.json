@@ -1,0 +1,1 @@
+["engine.py", "pdf_report.py", "glossary.json", "model/scripts/__init__.py", "model/scripts/fiscal.py", "model/scripts/mortality.py", "model/scripts/simulate.py", "model/config/parametres_fiscaux.yaml", "model/data/mortalite/insee.csv", "model/data/mortalite/tgh05.csv", "model/data/mortalite/provenance.yaml"]
